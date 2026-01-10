@@ -1,0 +1,26 @@
+:root {
+    --pink: #FF4FD8;
+    --green: #2AF59A;
+    --purple: #7A5CFF;
+    --orange: #FFB020;
+    --cyan: #28D8FF;
+
+    /* Radial brand blend (same palette) */
+    --brand-gradient:
+        radial-gradient(140% 140% at 0% 35%, rgba(255, 79, 216, .95) 0%, rgba(255, 79, 216, 0) 58%),
+        radial-gradient(140% 140% at 28% 0%, rgba(122, 92, 255, .95) 0%, rgba(122, 92, 255, 0) 60%),
+        radial-gradient(140% 140% at 72% 0%, rgba(40, 216, 255, .95) 0%, rgba(40, 216, 255, 0) 62%),
+        radial-gradient(140% 140% at 100% 45%, rgba(42, 245, 154, .90) 0%, rgba(42, 245, 154, 0) 60%),
+        radial-gradient(160% 160% at 55% 115%, rgba(255, 176, 32, .92) 0%, rgba(255, 176, 32, 0) 62%),
+        radial-gradient(140% 140% at 50% 55%, var(--purple) 0%, var(--purple) 100%);
+
+    --bg0: #090A0E;
+    --bg1: #0E1020;
+    --text: rgba(255, 255, 255, .92);
+    --muted: rgba(255, 255, 255, .60);
+
+    --shadow: 0 10px 30px rgba(0, 0, 0, .45);
+    --radius: 18px;
+    --radius2: 26px;
+    --tap: 44px;
+}

@@ -1,6 +1,6 @@
-import { state } from './state.js';
+import { state, loadState, saveState } from './state.js';
 import { $, on } from './modules/utils.js';
-import { renderFront, cycleFront, resetAllBack, bindModality } from './modules/flashcards.js';
+import { renderFront, nextCard, resetAllBack, bindModality } from './modules/flashcards.js';
 import { setTranslationDir, showTranslateB, newSentence, showTranslateA, handleFeedbackClick, renderFeedbackTokens } from './modules/translation.js';
 import { renderKeyStatus, handleImport, handleClear } from './modules/settings.js';
 
@@ -47,7 +47,7 @@ on('#tabTranslate', 'click', () => setTab('translate'));
 on('#tabSettings', 'click', () => setTab('settings'));
 
 // Flash controls (Next doubles as Skip)
-on('#btnFabNext', 'click', () => { cycleFront(); resetAllBack(); });
+on('#btnFabNext', 'click', () => { nextCard(); });
 
 // Modality binds
 bindModality($('#modPron'));
@@ -66,10 +66,6 @@ const fb = $('#fbSentence');
 if (fb) {
     fb.addEventListener('click', handleFeedbackClick);
 }
-// FIX: Moving listener attempt to below, I need to patch translation.js first? 
-// Actually, I can just attach the listener in app.js if I export setDetail? 
-// Better: add an initTranslation() in translation.js. 
-// For now, I will assume I can edit translation.js or I will fix it in next step.
 
 // Settings controls
 on('#apiKey', 'input', renderKeyStatus);
@@ -80,34 +76,20 @@ on('#btnImport', 'click', handleImport);
 on('#btnClearList', 'click', handleClear);
 
 on('#btnReset', 'click', () => {
-    setTab('flash');
-    state.sessionCount = 12;
-    state.card.front = 'hanzi';
-    state.card.word = '欢迎';
-    state.card.pinyinToned = 'huānyíng';
-    state.card.pinyinBare = 'huanying';
-    state.card.tones = '12';
-    state.card.meaning = 'welcome';
-    const dn = $('#deckName');
-    if (dn) dn.textContent = 'My Wordlist';
-    resetAllBack();
-    renderFront();
-    setTranslationDir('ENZH');
-    const ut = $('#userTranslation');
-    if (ut) ut.value = '';
-    const err = $('#importError');
-    const ok = $('#importOk');
-    if (err) err.style.display = 'none';
-    if (ok) ok.style.display = 'none';
-    const k = $('#apiKey');
-    if (k) k.value = '';
-    renderKeyStatus();
+    // Reset basically helps debugging by clearing everything
+    localStorage.clear();
+    location.reload();
 });
 
 // Init
+if (loadState()) {
+    console.log('State loaded. Wordlist size:', state.wordlist.length);
+} else {
+    console.log('No state found, starting fresh.');
+}
+
 setTab('flash');
-resetAllBack();
-renderFront();
+nextCard(); // Will render empty state if no words
 setTranslationDir('ENZH');
 renderKeyStatus();
 renderFeedbackTokens();

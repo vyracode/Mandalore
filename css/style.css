@@ -876,7 +876,7 @@ textarea {
     flex: 0 0 auto;
 }
 
-.error {
+.setting-card .error {
     display: none;
     border-radius: 16px;
     border: 1px solid rgba(255, 79, 216, .20);
@@ -887,7 +887,7 @@ textarea {
     line-height: 1.25;
 }
 
-.ok {
+.setting-card .ok {
     display: none;
     border-radius: 16px;
     border: 1px solid rgba(42, 245, 154, .20);

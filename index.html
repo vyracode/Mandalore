@@ -226,7 +226,6 @@
                     <div class="panel">
                         <div class="ph">
                             <h2>Settings</h2>
-                            <button class="btn ghost" id="btnReset" type="button">Reset UI</button>
                         </div>
                     </div>
 
@@ -239,44 +238,42 @@
                                 </div>
                                 <div class="pill" title="Key status"><span
                                         aria-hidden="true">🔑</span><small>Status</small><span id="keyStatus">Not
-                                        set</span></div>
-                            </div>
-                            <input id="apiKey" class="field mono" placeholder="AIza…" aria-label="Gemini API key" />
-                            <div style="display:flex; gap:10px">
-                                <button class="btn primary" id="btnSaveKey" style="flex:1" type="button">Save</button>
-                                <button class="btn ghost" id="btnClearKey" style="flex:1" type="button">Clear</button>
-                            </div>
-                        </div>
-
-                        <div class="setting-card">
-                            <div class="setting-row" style="align-items:flex-start">
-                                <div>
-                                    <div class="label">Import wordlist</div>
-                                    <div class="hint">Paste JSON array of {word,pinyin,definition}</div>
                                 </div>
-                            </div>
 
-                            <textarea id="wordlistJson" class="textarea-small mono" aria-label="Wordlist JSON">[
+                                <div class="setting-card">
+                                    <div class="setting-row"
+                                        style="align-items:flex-start; justify-content:space-between">
+                                        <div>
+                                            <div class="label">Import wordlist</div>
+                                            <div class="hint">Paste JSON array of {word,pinyin,definition}</div>
+                                        </div>
+                                        <button class="btn ghost" id="btnCopyPrompt" type="button"
+                                            style="font-size:12px; padding: 4px 10px;">Copy ChatGPT Prompt</button>
+                                    </div>
+
+                                    <textarea id="wordlistJson" class="textarea-small mono" aria-label="Wordlist JSON">[
   {"word":"欢迎","pinyin":"huānyíng","definition":"welcome"},
   {"word":"面包","pinyin":"miànbāo","definition":"bread"}
 ]</textarea>
 
-                            <div class="error" id="importError"></div>
-                            <div class="ok" id="importOk"></div>
+                                    <div class="error" id="importError"></div>
+                                    <div class="ok" id="importOk"></div>
 
-                            <div style="display:flex; gap:10px">
-                                <button class="btn primary" id="btnImport" style="flex:1" type="button">Import</button>
-                                <button class="btn ghost" id="btnClearList" style="flex:1" type="button">Clear</button>
+                                    <div style="display:flex; gap:10px">
+                                        <button class="btn primary" id="btnImport" style="flex:1"
+                                            type="button">Import</button>
+                                        <button class="btn ghost" id="btnForgetList" style="flex:1"
+                                            type="button">Forget</button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="settings-brand" aria-label="Mandalore">
+                                <div class="wordmark">Mandalore</div>
                             </div>
                         </div>
-                    </div>
 
-                    <div class="settings-brand" aria-label="Mandalore">
-                        <div class="wordmark">Mandalore</div>
                     </div>
-                </div>
-
-            </div>
         </main>
 
         <nav>

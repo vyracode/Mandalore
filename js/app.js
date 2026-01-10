@@ -1,8 +1,9 @@
 import { state, loadState, saveState } from './state.js';
 import { $, on } from './modules/utils.js';
 import { renderFront, nextCard, resetAllBack, bindModality } from './modules/flashcards.js';
-import { setTranslationDir, showTranslateB, newSentence, showTranslateA, handleFeedbackClick, renderFeedbackTokens } from './modules/translation.js';
-import { renderKeyStatus, handleImport, handleClear } from './modules/settings.js';
+import { setTranslationDir, checkTranslation, newSentence, showTranslateA, handleFeedbackClick, renderFeedbackTokens } from './modules/translation.js';
+import { renderKeyStatus, handleImport, handleForgetList, forgetKey, saveKey, copyPrompt, renderModel, handleModelChange } from './modules/settings.js';
+
 
 function runSmokeTests() {
     // Tests (logged only; never throws)
@@ -12,7 +13,7 @@ function runSmokeTests() {
         '#btnFabNext',
         '#modPron', '#modPinyin', '#modHanzi', '#modMeaning',
         '#fbSentence', '#btnSubmitTranslation', '#btnNewSentence', '#btnBackToInput',
-        '#btnImport', '#btnReset'
+        '#btnImport', '#btnForgetKey', '#btnForgetList'
     ];
     const missing = required.filter(s => !$(s));
     if (missing.length) {
@@ -58,7 +59,7 @@ bindModality($('#modMeaning'));
 // Translation controls
 on('#dirENZH', 'click', () => setTranslationDir('ENZH'));
 on('#dirZHEN', 'click', () => setTranslationDir('ZHEN'));
-on('#btnSubmitTranslation', 'click', () => showTranslateB());
+// on('#btnSubmitTranslation', 'click', ... ) -> Moved below
 on('#btnNewSentence', 'click', () => newSentence());
 on('#btnBackToInput', 'click', () => showTranslateA());
 
@@ -69,17 +70,17 @@ if (fb) {
 
 // Settings controls
 on('#apiKey', 'input', renderKeyStatus);
-on('#btnSaveKey', 'click', renderKeyStatus);
-on('#btnClearKey', 'click', () => { const k = $('#apiKey'); if (k) k.value = ''; renderKeyStatus(); });
+on('#btnSaveKey', 'click', saveKey);
+on('#geminiModel', 'change', handleModelChange);
+on('#btnForgetKey', 'click', forgetKey);
+on('#btnSubmitTranslation', 'click', () => checkTranslation());
+on('#btnCopyPrompt', 'click', copyPrompt);
 
 on('#btnImport', 'click', handleImport);
-on('#btnClearList', 'click', handleClear);
+on('#btnForgetList', 'click', handleForgetList);
 
-on('#btnReset', 'click', () => {
-    // Reset basically helps debugging by clearing everything
-    localStorage.clear();
-    location.reload();
-});
+// Reset UI removed as per request. Use individual Forget buttons.
+
 
 // Init
 if (loadState()) {
@@ -92,5 +93,6 @@ setTab('flash');
 nextCard(); // Will render empty state if no words
 setTranslationDir('ENZH');
 renderKeyStatus();
+renderModel();
 renderFeedbackTokens();
 runSmokeTests();

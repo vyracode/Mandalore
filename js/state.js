@@ -25,7 +25,10 @@ export const state = {
             { text: '吗', cls: 'extra', detail: 'Extra word. Your sentence already forms a question.' },
         ],
     },
-    imported: { deckName: 'My Wordlist' }
+    imported: { deckName: 'My Wordlist' },
+    apiKey: '',
+    geminiModel: 'gemini-2.5-flash',
+    cachedSentences: [] // [ { promptEN, promptZH, feedbackOverview, tokens } ]
 };
 
 const STORAGE_KEY = 'mandalore_state_v1';
@@ -34,7 +37,10 @@ export function saveState() {
     try {
         const data = {
             wordlist: state.wordlist,
-            deckName: state.imported.deckName
+            deckName: state.imported.deckName,
+            apiKey: state.apiKey,
+            geminiModel: state.geminiModel,
+            cachedSentences: state.cachedSentences
         };
         localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
     } catch (e) {
@@ -53,6 +59,9 @@ export function loadState() {
         if (data.deckName) {
             state.imported.deckName = data.deckName;
         }
+        if (data.apiKey) state.apiKey = data.apiKey;
+        if (data.geminiModel) state.geminiModel = data.geminiModel;
+        if (Array.isArray(data.cachedSentences)) state.cachedSentences = data.cachedSentences;
         return true;
     } catch (e) {
         console.error('Failed to load state', e);

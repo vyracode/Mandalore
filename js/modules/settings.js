@@ -1,11 +1,54 @@
 import { state, saveState } from '../state.js';
 import { $, $$ } from './utils.js';
 import { nextCard, renderFront, resetAllBack } from './flashcards.js';
+import { prompts } from './prompts.js';
 
 export function renderKeyStatus() {
-    const v = ($('#apiKey')?.value || '').trim();
     const s = $('#keyStatus');
-    if (s) s.textContent = v ? 'Set' : 'Not set';
+    if (s) {
+        if (state.apiKey) {
+            s.textContent = 'Set';
+            s.style.color = 'var(--green)';
+        } else {
+            s.textContent = 'Not set';
+            s.style.color = 'var(--text-muted)';
+        }
+    }
+}
+
+export function saveKey() {
+    const input = $('#apiKey');
+    if (!input) return;
+    const val = input.value.trim();
+    if (!val) return;
+    state.apiKey = val;
+    const modelSel = $('#geminiModel');
+    if (modelSel) state.geminiModel = modelSel.value;
+    saveState();
+    renderKeyStatus();
+    input.value = ''; // Clear input for security/cleanliness
+}
+
+export function forgetKey() {
+    if (!confirm('Forget Gemini API key?')) return;
+    state.apiKey = '';
+    saveState();
+    renderKeyStatus();
+    const input = $('#apiKey');
+    if (input) input.value = '';
+}
+
+export function renderModel() {
+    const sel = $('#geminiModel');
+    if (sel) sel.value = state.geminiModel;
+}
+
+export function handleModelChange() {
+    const sel = $('#geminiModel');
+    if (sel) {
+        state.geminiModel = sel.value;
+        saveState();
+    }
 }
 
 function showImportMessage(kind, msg) {
@@ -125,17 +168,35 @@ export function handleImport() {
     showImportMessage('ok', `Imported ${state.wordlist.length} words.`);
 }
 
-export function handleClear() {
+export function handleForgetList() {
+    if (!confirm('Forget all imported words?')) return;
     state.wordlist = [];
+    state.cachedSentences = [];
     saveState();
     const wl = $('#wordlistJson');
     if (wl) wl.value = '[]';
 
-    showImportMessage('ok', 'Wordlist cleared.');
+    showImportMessage('ok', 'Wordlist forgotten.');
 
     const dn = $('#deckName');
     if (dn) dn.textContent = 'Empty Wordlist';
 
     // Refresh card (will show empty state)
     nextCard();
+}
+
+export function copyPrompt() {
+    const prompt = prompts.copyChatGPT();
+
+    navigator.clipboard.writeText(prompt).then(() => {
+        const btn = $('#btnCopyPrompt');
+        if (btn) {
+            const original = btn.textContent;
+            btn.textContent = 'Copied!';
+            setTimeout(() => btn.textContent = original, 2000);
+        }
+    }).catch(err => {
+        console.error('Failed to copy text: ', err);
+        alert('Failed to copy prompt to clipboard.');
+    });
 }

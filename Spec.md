@@ -1,5 +1,5 @@
 # Mandalore
-Mandalore is a *companion webapp* for english speakers learning the mandarin language.
+Mandalore is a *companion web-app* for english speakers learning the mandarin language.
 Users take lessons from other learning resources, and input their wordlists and into Mandalore for practice.
 While the other resources continue to teach new material, Mandalore works to help users retain the material they have already learned.
 
@@ -90,8 +90,8 @@ Gemini's sentences are cached permanently, so they can be used again later, howe
 Sentances are returned from the Gemini API in the form of:
 ```json
 {
-    "mandarin": "Mandarin sentence (Hanzi)"
-    "english": "English sentence",
+    "mandarin": "Mandarin sentence (Hanzi)",
+    "english": "English sentence"
 }
 ```
 
@@ -117,6 +117,9 @@ Consider this a stub for now, apart from:
 - Import Wordlist (Accessed through Settings)
     - Simply a big textbox for pasting a json wordlist, and an "Import" button.
     - Clicking the Import button will provide an imformative and actionable error message to the user if something is wrong.
+- Asset Storage
+    - In the settings menu, the user can select a folder of word assets.
+    - These are then stored in the browser storage.
 
 # Tech Stack
 
@@ -127,7 +130,8 @@ Consider this a stub for now, apart from:
 - No frameworks no UI libraries
 
 ## Backend
-- dongyuwei/web-pinyin-ime (for PinyinKeyboard-like Hanzi multiple choice)
+- [dongyuwei/web-pinyin-ime](https://github.com/dongyuwei/web-pinyin-ime) (for PinyinKeyboard-like Hanzi multiple choice)
+- [open-spaced-repetition/ts-fsrs](https://github.com/open-spaced-repetition/ts-fsrs) (for flashcard spacing)
 - Gemini API (for Translation Practice) (Generous free tier, as long as they can train on your inputs, but that's fine)
 
 # Appearance

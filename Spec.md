@@ -112,7 +112,8 @@ Feedback is returned from the Gemini API in the form of:
 ```
 
 ## Settings
-Consider this a stub for now, apart from one thing:
+Consider this a stub for now, apart from:
+- Gemini API Key
 - Import Wordlist (Accessed through Settings)
     - Simply a big textbox for pasting a json wordlist, and an "Import" button.
     - Clicking the Import button will provide an imformative and actionable error message to the user if something is wrong.
@@ -123,6 +124,7 @@ Consider this a stub for now, apart from one thing:
 - HTML5
 - CSS3
 - Vanilla JS
+- No frameworks no UI libraries
 
 ## Backend
 - dongyuwei/web-pinyin-ime (for PinyinKeyboard-like Hanzi multiple choice)

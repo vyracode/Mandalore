@@ -1,6 +1,7 @@
 import { state, bumpSession } from '../state.js';
 import { $, $$, getAssetUrl, hasAsset } from './utils.js';
 import getCandidates from '../lib/pinyin-ime.esm.js';
+import { generateWordId } from './wordId.js';
 
 const FRONT_ORDER = ['hanzi', 'pronunciation', 'meaning'];
 const FRONT_LABEL = { hanzi: 'Hanzi', pronunciation: 'Audio', pinyin: 'Pinyin', meaning: 'Meaning' };
@@ -14,11 +15,11 @@ function speak(text) {
     window.speechSynthesis.speak(u);
 }
 
-function playAudioAsset(word) {
+function playAudioAsset(wordId, word) {
     // Try different audio extensions
     const audioExts = ['mp3', 'wav', 'ogg', 'm4a', 'aac'];
     for (const ext of audioExts) {
-        const url = getAssetUrl(word, ext, state.assetCache);
+        const url = getAssetUrl(wordId, word, ext, state.assetCache);
         if (url) {
             const audio = new Audio(url);
             audio.play().catch(e => console.error('Failed to play audio:', e));
@@ -28,17 +29,17 @@ function playAudioAsset(word) {
     return false;
 }
 
-function getImageAssetUrl(word) {
+function getImageAssetUrl(wordId, word) {
     // Try different image extensions
     const imageExts = ['jpg', 'jpeg', 'png', 'webp', 'gif'];
     for (const ext of imageExts) {
-        const url = getAssetUrl(word, ext, state.assetCache);
+        const url = getAssetUrl(wordId, word, ext, state.assetCache);
         if (url) return url;
     }
     return null;
 }
 
-function createAudioButton(word, autoplay = false) {
+function createAudioButton(wordId, word, autoplay = false) {
     const wrap = document.createElement('div');
     wrap.className = 'front-audio';
 
@@ -51,7 +52,7 @@ function createAudioButton(word, autoplay = false) {
     const playAudio = () => {
         btn.animate([{ transform: 'scale(1)' }, { transform: 'scale(1.03)' }, { transform: 'scale(1)' }], { duration: 220, easing: 'ease-out' });
         // Try asset first, fallback to TTS
-        if (!playAudioAsset(word)) {
+        if (!playAudioAsset(wordId, word)) {
             speak(word);
         }
     };
@@ -114,6 +115,7 @@ export function nextCard() {
     if (!state.wordlist || state.wordlist.length === 0) {
         // Empty state
         state.card.word = null;
+        state.card.id = '';
         renderFront();
         resetAllBack();
         return;
@@ -125,6 +127,8 @@ export function nextCard() {
     // Pick random front
     const front = FRONT_ORDER[Math.floor(Math.random() * FRONT_ORDER.length)];
 
+    // Use stored id, or generate on-the-fly for legacy wordlists without ids
+    state.card.id = item.id || generateWordId(item.word, item.pinyinToned);
     state.card.word = item.word;
     state.card.pinyinToned = item.pinyinToned;
     state.card.pinyinBare = item.pinyinBare;
@@ -182,7 +186,7 @@ export function renderFront() {
         container.appendChild(d);
         
         // Add image if available
-        const imageUrl = getImageAssetUrl(state.card.word);
+        const imageUrl = getImageAssetUrl(state.card.id, state.card.word);
         if (imageUrl) {
             const img = document.createElement('img');
             img.src = imageUrl;
@@ -203,7 +207,7 @@ export function renderFront() {
         body.appendChild(d);
     } else {
         // Pronunciation front - autoplay audio
-        const wrap = createAudioButton(state.card.word, true);
+        const wrap = createAudioButton(state.card.id, state.card.word, true);
         body.appendChild(wrap);
     }
 
@@ -320,7 +324,7 @@ function wireSoundButtons(scope = document) {
                 { duration: 220, easing: 'ease-out' }
             );
             // Try asset first, fallback to TTS
-            if (!playAudioAsset(state.card.word)) {
+            if (!playAudioAsset(state.card.id, state.card.word)) {
                 speak(state.card.word);
             }
         });
@@ -358,7 +362,7 @@ function checkSpeech(modCard) {
     
     // Create audio button with autoplay
     audioContainer.innerHTML = '';
-    const audioWrap = createAudioButton(state.card.word, true);
+    const audioWrap = createAudioButton(state.card.id, state.card.word, true);
     // Compact label
     const divs = audioWrap.querySelectorAll('div');
     if (divs.length > 1) {
@@ -452,7 +456,7 @@ function checkMeaning(modCard) {
     let content = `<strong>${state.card.meaning}</strong>`;
     
     // Add image thumbnail if available
-    const imageUrl = getImageAssetUrl(state.card.word);
+    const imageUrl = getImageAssetUrl(state.card.id, state.card.word);
     if (imageUrl) {
         content = `<img src="${imageUrl}" alt="" style="width:28px; height:28px; border-radius:6px; object-fit:cover; margin-right:8px; vertical-align:middle" />${content}`;
     }

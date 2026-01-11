@@ -15,6 +15,21 @@ Wordlists are imported as json, pasted into the app, and take the form of:
 ```
 Users are advised to convert whatever form of wordlist they have (eg: App Screenshots, Spreadsheets, etc) using an LLM such as ChatGPT.
 
+## WordID System
+Each word is assigned a unique identifier (WordID) derived from its canonicalized Hanzi and toned Pinyin using xxHash32.
+
+**Canonicalization:**
+- **Hanzi**: Unicode normalize (NFKC), remove all whitespace (including non-breaking/full-width), remove punctuation
+- **Pinyin**: Lowercase only (preserves tone marks)
+
+**Formula:** `WordID = xxHash32("[CanonicalizedHanzi]|[CanonicalizedTonedPinyin]|")`
+
+This ensures:
+- Two entries with the same Hanzi + Pinyin combination always map to the same ID
+- Formatting differences (whitespace, punctuation) don't create false duplicates
+- Assets can be matched by WordID (primary) or legacy Hanzi-based naming (fallback)
+- References to words are consistent across the entire app
+
 Mandalore ships with a default collection of assets, (Audio pronunciations, and Images to accompany definitions), which are automatically matched to words in imported wordlists.
 
 ## Principles
@@ -75,7 +90,11 @@ For self-grade modalities, we display "Right" and "Wrong" buttons with the revea
     - When Back: Entirely self-graded, with the reveal button providing the correct answer.
 - Note: If the back of the card includes both Hanzi and Pinyin Spelling, the multiple choice Hanzi and Pinyin Spelling textbox are replaced by a single *Hanzi Textbox*. This will test both modalities, as the user is assumed to use a Pinyin keyboard to write the Hanzi, which implicitly tests the Pinyin Spelling, and Hanzi multiple choice recognition. If the user is unable to do this, the user can toggle to go back to the seperate inputs.
 
-Assets are located by removing whitespace from a Hanzi word, sanitizing it, then checking for a file with that name and the extension for that type of asset, in the "word_assets" folder.
+Assets are located using the WordID system:
+1. **Primary**: Look for a file named `{WordID}.{extension}` (e.g., `a1b2c3d4.mp3`)
+2. **Fallback**: For backward compatibility, also check for legacy Hanzi-based filenames (sanitized Hanzi with whitespace/special chars removed)
+
+Asset files should be named by their WordID for new assets.
 
 ## Translation Practice
 Translation Practice allows users to translate sentences from English to Mandarin, and vice versa.

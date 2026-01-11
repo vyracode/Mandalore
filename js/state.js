@@ -4,6 +4,7 @@ export const state = {
     translationDir: 'ENZH',
     card: {
         front: 'hanzi',
+        id: '',           // WordID (xxHash of canonicalized hanzi + toned pinyin)
         word: '',
         pinyinToned: '',
         pinyinBare: '',
@@ -11,7 +12,7 @@ export const state = {
         meaning: '',
         audioLabel: 'Pronunciation',
     },
-    wordlist: [], // { word, pinyin, definition, pinyinBare, tones }
+    wordlist: [], // { id, word, pinyinToned, meaning, pinyinBare, tones }
     translation: {
         promptEN: 'Welcome home. Do you want bread?',
         promptZH: '欢迎回家。你想要面包吗？',

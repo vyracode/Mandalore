@@ -2,7 +2,7 @@ import { state, saveState } from '../state.js';
 import { $, $$ } from './utils.js';
 import { nextCard, renderFront, resetAllBack } from './flashcards.js';
 import { prompts } from './prompts.js';
-import { sanitizeWordName } from './utils.js';
+import { generateWordId } from './wordId.js';
 
 export function renderKeyStatus() {
     const s = $('#keyStatus');
@@ -133,11 +133,14 @@ function processPinyin(pinyinToned) {
 }
 
 function applyImportedDeck(data) {
-    // Create a map of existing words by Hanzi for quick lookup
+    // Create a map of existing words by WordID for quick lookup
+    // WordID is the canonical unique identifier (xxHash of hanzi + toned pinyin)
     const existingMap = new Map();
     if (state.wordlist && state.wordlist.length > 0) {
         for (const word of state.wordlist) {
-            existingMap.set(word.word, word);
+            // Use existing id, or generate one for legacy entries
+            const id = word.id || generateWordId(word.word, word.pinyinToned);
+            existingMap.set(id, { ...word, id });
         }
     }
     
@@ -150,8 +153,12 @@ function applyImportedDeck(data) {
         const p = item.pinyin.trim();
         const d = item.definition.trim();
         const { bare, tones } = processPinyin(p);
+        
+        // Generate the unique WordID
+        const id = generateWordId(w, p);
 
         const wordEntry = {
+            id: id,
             word: w,
             pinyinToned: p,
             meaning: d,
@@ -159,13 +166,13 @@ function applyImportedDeck(data) {
             tones: tones
         };
         
-        if (existingMap.has(w)) {
-            // Word exists - update it with new data
-            existingMap.set(w, wordEntry);
+        if (existingMap.has(id)) {
+            // Word exists (same Hanzi + Pinyin) - update it with new data
+            existingMap.set(id, wordEntry);
             updatedCount++;
         } else {
             // New word - add it
-            existingMap.set(w, wordEntry);
+            existingMap.set(id, wordEntry);
             newCount++;
         }
     }

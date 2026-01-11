@@ -176,7 +176,9 @@ export function renderFront() {
         
         const d = document.createElement('div');
         d.className = 'front-meaning';
-        d.textContent = state.card.meaning;
+        // Capitalize first letter of English definition
+        const meaning = state.card.meaning || '';
+        d.textContent = meaning.charAt(0).toUpperCase() + meaning.slice(1);
         container.appendChild(d);
         
         // Add image if available

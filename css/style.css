@@ -250,8 +250,8 @@ nav {
 }
 
 .front-card {
-    flex: 0 0 120px;
-    min-height: 120px;
+    flex: 0 0 180px;
+    min-height: 180px;
     border-radius: 22px;
     background:
         radial-gradient(600px 250px at 20% 0%, rgba(255, 79, 216, .22), transparent 55%),
@@ -260,11 +260,11 @@ nav {
     border: 1px solid rgba(255, 255, 255, .12);
     box-shadow: 0 18px 46px rgba(0, 0, 0, .45), inset 0 1px 0 rgba(255, 255, 255, .10);
     overflow: hidden;
-    padding: 10px 14px;
+    padding: 14px;
     display: flex;
     flex-direction: column;
     justify-content: space-between;
-    gap: 8px;
+    gap: 12px;
 }
 
 .front-top {
@@ -305,7 +305,7 @@ nav {
     text-align: center;
     flex: 1;
     min-height: 0;
-    padding: 4px 8px;
+    padding: 6px 8px;
 }
 
 .front-hanzi {
@@ -1144,7 +1144,7 @@ textarea:focus-visible {
     }
 
     .front-card {
-        flex-basis: 140px;
-        min-height: 140px
+        flex-basis: 210px;
+        min-height: 210px
     }
 }

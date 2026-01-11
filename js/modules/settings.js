@@ -133,24 +133,46 @@ function processPinyin(pinyinToned) {
 }
 
 function applyImportedDeck(data) {
-    const list = [];
+    // Create a map of existing words by Hanzi for quick lookup
+    const existingMap = new Map();
+    if (state.wordlist && state.wordlist.length > 0) {
+        for (const word of state.wordlist) {
+            existingMap.set(word.word, word);
+        }
+    }
+    
+    let newCount = 0;
+    let updatedCount = 0;
+    
+    // Process imported data and merge with existing
     for (const item of data) {
         const w = item.word.trim();
         const p = item.pinyin.trim();
         const d = item.definition.trim();
         const { bare, tones } = processPinyin(p);
 
-        list.push({
+        const wordEntry = {
             word: w,
             pinyinToned: p,
             meaning: d,
             pinyinBare: bare,
             tones: tones
-        });
+        };
+        
+        if (existingMap.has(w)) {
+            // Word exists - update it with new data
+            existingMap.set(w, wordEntry);
+            updatedCount++;
+        } else {
+            // New word - add it
+            existingMap.set(w, wordEntry);
+            newCount++;
+        }
     }
-
-    state.wordlist = list;
-    state.imported.deckName = `Imported (${list.length} words)`;
+    
+    // Convert map back to array
+    state.wordlist = Array.from(existingMap.values());
+    state.imported.deckName = `Imported (${state.wordlist.length} words)`;
 
     saveState();
 
@@ -159,14 +181,21 @@ function applyImportedDeck(data) {
 
     // Start fresh
     nextCard();
+    
+    // Return counts for user feedback
+    return { newCount, updatedCount, total: state.wordlist.length };
 }
 
 export function handleImport() {
     const text = ($('#wordlistJson')?.value || '');
     const v = validateWordlistJson(text);
     if (!v.ok) return showImportMessage('error', v.msg);
-    applyImportedDeck(v.data);
-    showImportMessage('ok', `Imported ${state.wordlist.length} words.`);
+    
+    const counts = applyImportedDeck(v.data);
+    let message = `Total: ${counts.total} words`;
+    if (counts.newCount > 0) message += ` (${counts.newCount} new)`;
+    if (counts.updatedCount > 0) message += ` (${counts.updatedCount} updated)`;
+    showImportMessage('ok', message);
 }
 
 export function handleForgetList() {
@@ -289,7 +318,8 @@ export async function handleFileSelect(event) {
                 showImportMessage('error', `${file.name}: ${v.msg}`);
                 return;
             }
-            applyImportedDeck(v.data);
+            const counts = applyImportedDeck(v.data);
+            // Message will be updated after all files are processed
         }
 
         // Handle image files via Gemini 3 Flash
@@ -321,10 +351,12 @@ export async function handleFileSelect(event) {
                 return;
             }
 
-            applyImportedDeck(v.data);
+            const counts = applyImportedDeck(v.data);
         }
 
-        showImportMessage('ok', `Imported ${state.wordlist.length} words.`);
+        // Show final summary
+        let message = `Total: ${state.wordlist.length} words`;
+        showImportMessage('ok', message);
 
     } catch (e) {
         showImportMessage('error', e.message);

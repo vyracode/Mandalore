@@ -116,7 +116,7 @@ export function renderFront() {
         body.appendChild(d);
     } else if (f === 'pinyin') {
         const d = document.createElement('div');
-        d.className = 'front-pinyin mono';
+        d.className = 'front-pinyin';
         d.textContent = state.card.pinyinToned;
         body.appendChild(d);
     } else {
@@ -136,7 +136,7 @@ export function renderFront() {
 
         const d = document.createElement('div');
         d.style.textAlign = 'left';
-        d.innerHTML = `<div style="font-weight:950; font-size:16px; letter-spacing:.2px">${state.card.audioLabel}</div><div style="margin-top:4px; color: rgba(255,255,255,.65); font-weight:800; font-size:12px">Tap to play</div>`;
+        d.innerHTML = `<div style="font-family:'Google Sans',system-ui,-apple-system,sans-serif; font-weight:950; font-size:16px; letter-spacing:.2px">${state.card.audioLabel}</div><div style="margin-top:4px; color: rgba(255,255,255,.65); font-family:'Google Sans',system-ui,-apple-system,sans-serif; font-weight:800; font-size:12px">Tap to play</div>`;
         wrap.appendChild(d);
 
         body.appendChild(wrap);
@@ -231,7 +231,7 @@ function checkTone(modCard) {
     bumpSession(ok ? 1 : 0);
 
     ans.style.display = 'block';
-    ans.innerHTML = `<strong>Tones:</strong> <span class="mono">${correct}</span>`;
+    ans.innerHTML = `<strong>Tones:</strong> <span>${correct}</span>`;
 }
 
 // Pronunciation: Speak
@@ -246,8 +246,8 @@ function checkSpeech(modCard) {
           <div class="waves" aria-hidden="true"><span></span><span></span><span></span><span></span></div>
         </button>
         <div style="text-align:left">
-          <div style="font-weight:950; font-size:16px; letter-spacing:.2px">Example audio</div>
-          <div style="margin-top:4px; color: rgba(255,255,255,.65); font-weight:800; font-size:12px">Tap to play</div>
+          <div style="font-family:'Google Sans',system-ui,-apple-system,sans-serif; font-weight:950; font-size:16px; letter-spacing:.2px">Example audio</div>
+          <div style="margin-top:4px; color: rgba(255,255,255,.65); font-family:'Google Sans',system-ui,-apple-system,sans-serif; font-weight:800; font-size:12px">Tap to play</div>
         </div>
       </div>
     `;
@@ -269,7 +269,7 @@ function checkPinyin(modCard) {
     bumpSession(ok ? 1 : 0);
 
     ans.style.display = 'block';
-    ans.innerHTML = `<strong>Answer:</strong> <span class="mono">${correct}</span>`;
+    ans.innerHTML = `<strong>Answer:</strong> <span>${correct}</span>`;
 }
 
 // Hanzi: pick

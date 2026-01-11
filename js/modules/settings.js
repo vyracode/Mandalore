@@ -186,7 +186,7 @@ export function handleForgetList() {
 }
 
 export function copyPrompt() {
-    const prompt = prompts.copyChatGPT();
+    const prompt = prompts.wordlistExtraction();
 
     navigator.clipboard.writeText(prompt).then(() => {
         const btn = $('#btnCopyPrompt');
@@ -199,4 +199,136 @@ export function copyPrompt() {
         console.error('Failed to copy text: ', err);
         alert('Failed to copy prompt to clipboard.');
     });
+}
+
+// --- Browse Import ---
+
+async function callGeminiWithImages(prompt, base64Images) {
+    if (!state.apiKey) {
+        throw new Error("Missing API Key. Go to Settings to set it.");
+    }
+
+    // Always use Gemini 3 Flash for image extraction
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${state.apiKey}`;
+
+    const parts = [{ text: prompt }];
+    for (const img of base64Images) {
+        parts.push({
+            inline_data: {
+                mime_type: img.mimeType,
+                data: img.data
+            }
+        });
+    }
+
+    const payload = {
+        contents: [{ parts }]
+    };
+
+    const res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+    });
+
+    if (!res.ok) {
+        const err = await res.text();
+        console.error('[Gemini API Error]', res.status, res.statusText, err);
+        throw new Error(`Gemini API Error: ${res.status} ${res.statusText}`);
+    }
+
+    const data = await res.json();
+    const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
+    if (!text) throw new Error("No response text from Gemini.");
+
+    // Extract JSON from codeblock if present
+    const match = text.match(/```(?:json)?\s*([\s\S]*?)```/);
+    const jsonStr = match ? match[1].trim() : text.trim();
+
+    try {
+        return JSON.parse(jsonStr);
+    } catch (e) {
+        console.error("Failed to parse JSON from Gemini", jsonStr);
+        throw new Error("Gemini returned invalid JSON.");
+    }
+}
+
+function readFileAsBase64(file) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => {
+            const base64 = reader.result.split(',')[1];
+            resolve({ data: base64, mimeType: file.type });
+        };
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+    });
+}
+
+export function triggerBrowse() {
+    const fileInput = $('#fileInput');
+    if (fileInput) fileInput.click();
+}
+
+export async function handleFileSelect(event) {
+    const files = Array.from(event.target.files || []);
+    if (files.length === 0) return;
+
+    const jsonFiles = files.filter(f => f.type === 'application/json' || f.name.endsWith('.json'));
+    const imageFiles = files.filter(f => f.type.startsWith('image/'));
+
+    showImportMessage('ok', 'Processing files...');
+
+    try {
+        // Handle JSON files
+        for (const file of jsonFiles) {
+            const text = await file.text();
+            const v = validateWordlistJson(text);
+            if (!v.ok) {
+                showImportMessage('error', `${file.name}: ${v.msg}`);
+                return;
+            }
+            applyImportedDeck(v.data);
+        }
+
+        // Handle image files via Gemini 3 Flash
+        if (imageFiles.length > 0) {
+            showImportMessage('ok', `Extracting from ${imageFiles.length} image(s)...`);
+
+            const base64Images = await Promise.all(imageFiles.map(readFileAsBase64));
+
+            // First pass: Extract
+            const extractPrompt = prompts.wordlistExtraction();
+            const firstPass = await callGeminiWithImages(extractPrompt, base64Images);
+
+            if (!Array.isArray(firstPass)) {
+                throw new Error("Expected JSON array from image extraction.");
+            }
+
+            // Second pass: Verify and correct
+            showImportMessage('ok', `Verifying extraction...`);
+            const verifyPrompt = prompts.wordlistVerification(JSON.stringify(firstPass, null, 2));
+            const verifiedData = await callGeminiWithImages(verifyPrompt, base64Images);
+
+            if (!Array.isArray(verifiedData)) {
+                throw new Error("Verification failed to return JSON array.");
+            }
+
+            const v = validateWordlistJson(JSON.stringify(verifiedData));
+            if (!v.ok) {
+                showImportMessage('error', `Image extraction failed: ${v.msg}`);
+                return;
+            }
+
+            applyImportedDeck(v.data);
+        }
+
+        showImportMessage('ok', `Imported ${state.wordlist.length} words.`);
+
+    } catch (e) {
+        showImportMessage('error', e.message);
+    }
+
+    // Reset file input
+    event.target.value = '';
 }

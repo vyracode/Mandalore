@@ -26,13 +26,29 @@ Do not just include the problematic words. The word array you provide will be re
 `;
     },
 
-    copyChatGPT: () => {
-        return `Please output the wordlist as a JSON array of objects with keys: "word" (Hanzi), "pinyin" (with tone marks), and "definition" (English). 
+    wordlistExtraction: () => {
+        return `Extract the wordlist and output it as a JSON array of objects with keys: "word" (Hanzi), "pinyin" (with tone marks), and "definition" (English). 
 Example format:
 [
   {"word": "欢迎", "pinyin": "huānyíng", "definition": "welcome"},
   {"word": "面包", "pinyin": "miànbāo", "definition": "bread"}
 ]
-Output the JSON array in a codeblock.`;
+Output ONLY the JSON array in a codeblock.`;
+    },
+
+    wordlistVerification: (extractedJson) => {
+        return `Review the following wordlist extraction for errors. Check against the image(s) to verify:
+- All words were captured (nothing missed)
+- Pinyin has correct tone marks
+- Definitions are accurate
+- Correct letter casing
+- No duplicates or typos
+
+Extracted data:
+${extractedJson}
+
+If corrections are needed, output the corrected JSON array in a codeblock.
+If it looks correct, output the same JSON array in a codeblock.
+Output ONLY the JSON array.`;
     }
 };

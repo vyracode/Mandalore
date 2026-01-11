@@ -355,6 +355,9 @@ async function cacheAssetFiles(files) {
     const audioExts = ['mp3', 'wav', 'ogg', 'm4a', 'aac'];
     const imageExts = ['jpg', 'jpeg', 'png', 'webp', 'gif'];
     
+    let totalSize = 0;
+    let cachedCount = 0;
+    
     for (const file of files) {
         const ext = file.name.split('.').pop()?.toLowerCase();
         if (!ext) continue;
@@ -364,16 +367,31 @@ async function cacheAssetFiles(files) {
         
         try {
             const dataUrl = await readFileAsDataUrl(file);
-            // Store by filename (case-insensitive lookup handled in getAssetUrl)
-            state.assetCache[file.name] = dataUrl;
-            state.assetCache[file.name.toLowerCase()] = dataUrl;
+            const size = dataUrl.length;
+            totalSize += size;
+            
+            // Store by lowercase filename for consistency (getAssetUrl handles case-insensitive lookup)
+            const key = file.name.toLowerCase();
+            state.assetCache[key] = dataUrl;
+            cachedCount++;
         } catch (e) {
             console.error(`Failed to cache ${file.name}:`, e);
         }
     }
     
-    saveState();
-    renderAssetStatus();
+    const sizeInMB = totalSize / (1024 * 1024);
+    console.log(`Cached ${cachedCount} assets, total size: ${sizeInMB.toFixed(2)}MB`);
+    
+    // Try to save state
+    try {
+        saveState();
+        renderAssetStatus();
+    } catch (e) {
+        console.error('Failed to save assets to localStorage:', e);
+        if (e.name === 'QuotaExceededError' || e.code === 22) {
+            alert(`Warning: Asset cache is too large (${sizeInMB.toFixed(2)}MB) and exceeds browser storage limits. Assets may not persist after page reload.`);
+        }
+    }
 }
 
 function readFileAsDataUrl(file) {

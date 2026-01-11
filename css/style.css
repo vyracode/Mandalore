@@ -535,10 +535,12 @@ nav {
 /* Audio reveal (reuse front audio UI inside cards) */
 .audio-reveal {
     display: none;
+    width: 100%;
 }
 
 .audio-reveal .front-audio {
     padding: 6px 2px;
+    width: 100%;
 }
 
 /* Pronunciation split */

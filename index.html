@@ -43,6 +43,73 @@
 
                         <div class="mod" id="modStack">
 
+                            <!-- Meaning (self-grade after check) -->
+                            <div class="mod-card" data-mod="meaning" id="modMeaning">
+                                <div class="mod-head">
+                                    <div class="chip"><span class="mini"
+                                            style="background: var(--orange); box-shadow: 0 0 0 3px rgba(255,176,32,.14)"
+                                            aria-hidden="true"></span> Meaning</div>
+                                    <div class="mod-actions">
+                                        <button class="btn" data-action="checkMeaning" type="button">Check</button>
+                                    </div>
+                                </div>
+                                <div class="mod-body">
+                                    <div class="answer" data-role="meaningAnswer"></div>
+                                    <div class="result" data-role="meaningResult"><span class="r-dot"
+                                            aria-hidden="true"></span><span data-role="meaningMsg">Right</span></div>
+                                    <div class="row selfgrade" data-role="meaningSelf">
+                                        <button class="btn good" data-action="selfRight" type="button"
+                                            style="flex:1">Right</button>
+                                        <button class="btn bad" data-action="selfWrong" type="button"
+                                            style="flex:1">Wrong</button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Hanzi (multiple choice) -->
+                            <div class="mod-card" data-mod="hanzi" id="modHanzi">
+                                <div class="mod-head">
+                                    <div class="chip"><span class="mini"
+                                            style="background: var(--cyan); box-shadow: 0 0 0 3px rgba(40,216,255,.14)"
+                                            aria-hidden="true"></span> Hanzi</div>
+                                    <div class="mod-actions"></div>
+                                </div>
+                                <div class="mod-body">
+                                    <div class="choices" role="group" aria-label="Hanzi choices">
+                                        <button class="choice" data-choice type="button">欢迎</button>
+                                        <button class="choice" data-choice type="button">环境</button>
+                                        <button class="choice" data-choice type="button">缓应</button>
+                                        <button class="choice" data-choice type="button">欢饮</button>
+                                        <button class="choice" data-choice type="button">欢迎吧</button>
+                                        <button class="choice" data-choice type="button">欢影</button>
+                                    </div>
+                                    <div class="result" data-role="hanziResult"><span class="r-dot"
+                                            aria-hidden="true"></span><span data-role="hanziMsg">Right</span></div>
+                                    <div class="answer" data-role="hanziAnswer"></div>
+                                </div>
+                            </div>
+
+                            <!-- Pinyin spelling (graded) -->
+                            <div class="mod-card" data-mod="pinyin" id="modPinyin">
+                                <div class="mod-head">
+                                    <div class="chip"><span class="mini"
+                                            style="background: var(--purple); box-shadow: 0 0 0 3px rgba(122,92,255,.14)"
+                                            aria-hidden="true"></span> Spelling</div>
+                                    <div class="mod-actions"></div>
+                                </div>
+                                <div class="mod-body">
+                                    <div class="row">
+                                        <input class="field" inputmode="latin" type="text" enterkeyhint="go"
+                                            autocapitalize="none" autocorrect="off" placeholder="pinyin (no tones)" 
+                                            data-input="pinyin" aria-label="Pinyin spelling" />
+                                        <button class="btn" data-action="checkPinyin" type="button">Check</button>
+                                    </div>
+                                    <div class="result" data-role="pinyinResult"><span class="r-dot"
+                                            aria-hidden="true"></span><span data-role="pinyinMsg">Right</span></div>
+                                    <div class="answer" data-role="pinyinAnswer"></div>
+                                </div>
+                            </div>
+
                             <!-- Pronunciation -->
                             <div class="mod-card" data-mod="pronunciation" id="modPron">
                                 <div class="mod-head">
@@ -53,9 +120,9 @@
                                 <div class="mod-body pron">
                                     <div class="pron-block pron-tone">
                                         <div class="row" style="justify-content:space-between">
-                                            <input class="field" inputmode="numeric" pattern="[0-9]*"
-                                                placeholder="tone numbers" data-input="tone"
-                                                aria-label="Tone numbers" />
+                                            <input class="field" inputmode="numeric" type="tel" enterkeyhint="go"
+                                                pattern="[0-9]*" autocorrect="off" placeholder="tone numbers" 
+                                                data-input="tone" aria-label="Tone numbers" />
                                             <button class="btn" data-action="checkTone" type="button">Check</button>
                                         </div>
 
@@ -83,72 +150,6 @@
                                                 type="button">Right</button>
                                             <button class="btn bad" data-action="selfWrong" type="button">Wrong</button>
                                         </div>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <!-- Pinyin spelling (graded) -->
-                            <div class="mod-card" data-mod="pinyin" id="modPinyin">
-                                <div class="mod-head">
-                                    <div class="chip"><span class="mini"
-                                            style="background: var(--purple); box-shadow: 0 0 0 3px rgba(122,92,255,.14)"
-                                            aria-hidden="true"></span> Spelling</div>
-                                    <div class="mod-actions"></div>
-                                </div>
-                                <div class="mod-body">
-                                    <div class="row">
-                                        <input class="field" placeholder="pinyin (no tones)" data-input="pinyin"
-                                            aria-label="Pinyin spelling" />
-                                        <button class="btn" data-action="checkPinyin" type="button">Check</button>
-                                    </div>
-                                    <div class="result" data-role="pinyinResult"><span class="r-dot"
-                                            aria-hidden="true"></span><span data-role="pinyinMsg">Right</span></div>
-                                    <div class="answer" data-role="pinyinAnswer"></div>
-                                </div>
-                            </div>
-
-                            <!-- Hanzi (multiple choice) -->
-                            <div class="mod-card" data-mod="hanzi" id="modHanzi">
-                                <div class="mod-head">
-                                    <div class="chip"><span class="mini"
-                                            style="background: var(--cyan); box-shadow: 0 0 0 3px rgba(40,216,255,.14)"
-                                            aria-hidden="true"></span> Hanzi</div>
-                                    <div class="mod-actions"></div>
-                                </div>
-                                <div class="mod-body">
-                                    <div class="choices" role="group" aria-label="Hanzi choices">
-                                        <button class="choice" data-choice type="button">欢迎</button>
-                                        <button class="choice" data-choice type="button">环境</button>
-                                        <button class="choice" data-choice type="button">缓应</button>
-                                        <button class="choice" data-choice type="button">欢饮</button>
-                                        <button class="choice" data-choice type="button">欢迎吧</button>
-                                        <button class="choice" data-choice type="button">欢影</button>
-                                    </div>
-                                    <div class="result" data-role="hanziResult"><span class="r-dot"
-                                            aria-hidden="true"></span><span data-role="hanziMsg">Right</span></div>
-                                    <div class="answer" data-role="hanziAnswer"></div>
-                                </div>
-                            </div>
-
-                            <!-- Meaning (self-grade after check) -->
-                            <div class="mod-card" data-mod="meaning" id="modMeaning">
-                                <div class="mod-head">
-                                    <div class="chip"><span class="mini"
-                                            style="background: var(--orange); box-shadow: 0 0 0 3px rgba(255,176,32,.14)"
-                                            aria-hidden="true"></span> Meaning</div>
-                                    <div class="mod-actions">
-                                        <button class="btn" data-action="checkMeaning" type="button">Check</button>
-                                    </div>
-                                </div>
-                                <div class="mod-body">
-                                    <div class="answer" data-role="meaningAnswer"></div>
-                                    <div class="result" data-role="meaningResult"><span class="r-dot"
-                                            aria-hidden="true"></span><span data-role="meaningMsg">Right</span></div>
-                                    <div class="row selfgrade" data-role="meaningSelf">
-                                        <button class="btn good" data-action="selfRight" type="button"
-                                            style="flex:1">Right</button>
-                                        <button class="btn bad" data-action="selfWrong" type="button"
-                                            style="flex:1">Wrong</button>
                                     </div>
                                 </div>
                             </div>
@@ -181,7 +182,8 @@
                             </div>
 
                             <div class="input-area">
-                                <textarea id="userTranslation" placeholder="Type Hanzi, Pinyin, and/or English"
+                                <textarea id="userTranslation" inputmode="text" enterkeyhint="send"
+                                    spellcheck="false" placeholder="Type Hanzi, Pinyin, and/or English"
                                     aria-label="Your translation"></textarea>
                                 <div class="translate-actions">
                                     <button class="btn ghost" id="btnNewSentence" type="button">New sentence</button>
@@ -240,7 +242,9 @@
                                         aria-hidden="true">🔑</span><small>Status</small><span id="keyStatus">Not
                                         set</span></div>
                             </div>
-                            <input id="apiKey" class="field mono" placeholder="AIza…" aria-label="Gemini API key" />
+                            <input id="apiKey" class="field mono" inputmode="text" type="text" enterkeyhint="done"
+                                autocapitalize="none" autocorrect="off" autocomplete="off" spellcheck="false"
+                                placeholder="AIza…" aria-label="Gemini API key" />
                             <div class="setting-row" style="margin-top: 8px;">
                                 <div class="label" style="font-size: 13px;">Model</div>
                                 <select id="geminiModel" class="field"
@@ -268,7 +272,8 @@
                                     style="font-size:12px; padding: 4px 10px;">Copy ChatGPT Prompt</button>
                             </div>
 
-                            <textarea id="wordlistJson" class="textarea-small mono" aria-label="Wordlist JSON">[
+                            <textarea id="wordlistJson" class="textarea-small mono" inputmode="text" enterkeyhint="done"
+                                autocapitalize="none" autocorrect="off" spellcheck="false" aria-label="Wordlist JSON">[
   {"word":"欢迎","pinyin":"huānyíng","definition":"welcome"},
   {"word":"面包","pinyin":"miànbāo","definition":"bread"}
 ]</textarea>

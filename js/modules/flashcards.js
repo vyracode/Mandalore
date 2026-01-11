@@ -2,7 +2,7 @@ import { state, bumpSession } from '../state.js';
 import { $, $$, getAssetUrl, hasAsset } from './utils.js';
 import getCandidates from '../lib/pinyin-ime.esm.js';
 
-const FRONT_ORDER = ['hanzi', 'pronunciation', 'pinyin', 'meaning'];
+const FRONT_ORDER = ['hanzi', 'pronunciation', 'meaning'];
 const FRONT_LABEL = { hanzi: 'Hanzi', pronunciation: 'Audio', pinyin: 'Pinyin', meaning: 'Meaning' };
 const FRONT_HINT = { hanzi: 'Recognize the word', pronunciation: 'Recognize the sound', pinyin: 'Recognize the spelling', meaning: 'Recall the Mandarin' };
 
@@ -248,7 +248,30 @@ function resetModality(modCard) {
 }
 
 export function resetAllBack() {
-    ['#modPron', '#modPinyin', '#modHanzi', '#modMeaning'].forEach(sel => resetModality($(sel)));
+    // Map front types to mod-card selectors
+    const frontToMod = {
+        'pronunciation': '#modPron',
+        'pinyin': '#modPinyin',
+        'hanzi': '#modHanzi',
+        'meaning': '#modMeaning'
+    };
+    
+    // Hide the front modality, show all others
+    const allMods = ['#modPron', '#modPinyin', '#modHanzi', '#modMeaning'];
+    const frontMod = state.card.front ? frontToMod[state.card.front] : null;
+    
+    allMods.forEach(sel => {
+        const modCard = $(sel);
+        if (modCard) {
+            // Hide if it's the front modality, show otherwise
+            if (sel === frontMod) {
+                modCard.style.display = 'none';
+            } else {
+                modCard.style.display = ''; // Remove inline style to use default CSS
+                resetModality(modCard);
+            }
+        }
+    });
 }
 
 export function cycleFront() {
@@ -311,9 +334,10 @@ function checkSpeech(modCard) {
         a.innerHTML = '';
         // Use createAudioButton with autoplay for reveal
         const audioWrap = createAudioButton(state.card.word, true);
-        // Update label
-        const labelDiv = audioWrap.querySelector('div');
-        if (labelDiv) {
+        // Update label - find the text div (second child div)
+        const divs = audioWrap.querySelectorAll('div');
+        if (divs.length > 1) {
+            const labelDiv = divs[1]; // Second div is the label container
             labelDiv.innerHTML = `<div style="font-family:'Google Sans',system-ui,-apple-system,sans-serif; font-weight:950; font-size:16px; letter-spacing:.2px">Example audio</div><div style="margin-top:4px; color: rgba(255,255,255,.65); font-family:'Google Sans',system-ui,-apple-system,sans-serif; font-weight:800; font-size:12px">Tap to play</div>`;
         }
         a.appendChild(audioWrap);
@@ -474,5 +498,21 @@ export function bindModality(modCard) {
         }
 
         if (t.matches('[data-choice]')) return pickHanzi(modCard, t);
+    });
+    
+    // Add Enter key support for input fields
+    modCard.addEventListener('keydown', (e) => {
+        if (state.card.word === null) return; // Disable interactions if empty
+        
+        if (e.key === 'Enter' && e.target instanceof HTMLInputElement) {
+            const input = e.target;
+            if (input.matches('[data-input="tone"]')) {
+                e.preventDefault();
+                checkTone(modCard);
+            } else if (input.matches('[data-input="pinyin"]')) {
+                e.preventDefault();
+                checkPinyin(modCard);
+            }
+        }
     });
 }

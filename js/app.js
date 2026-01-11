@@ -87,6 +87,31 @@ on('#btnClearAssets', 'click', clearAssets);
 // Reset UI removed as per request. Use individual Forget buttons.
 
 
+// Register Service Worker for PWA
+if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/sw.js')
+            .then((registration) => {
+                console.log('[Service Worker] Registered successfully:', registration.scope);
+                
+                // Check for updates
+                registration.addEventListener('updatefound', () => {
+                    const newWorker = registration.installing;
+                    newWorker.addEventListener('statechange', () => {
+                        if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                            // New service worker available, prompt user to reload
+                            console.log('[Service Worker] New version available');
+                            // Optionally show a notification to the user
+                        }
+                    });
+                });
+            })
+            .catch((error) => {
+                console.warn('[Service Worker] Registration failed:', error);
+            });
+    });
+}
+
 // Init
 if (loadState()) {
     console.log('State loaded. Wordlist size:', state.wordlist.length);

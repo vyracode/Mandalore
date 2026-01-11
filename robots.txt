@@ -1,0 +1,140 @@
+# Mandalore - Personal Learning Tool
+# This site is private and not intended for public access or indexing
+
+# Block all standard web crawlers
+User-agent: *
+Disallow: /
+
+# Block Google crawlers
+User-agent: Googlebot
+Disallow: /
+
+User-agent: Googlebot-Image
+Disallow: /
+
+User-agent: Googlebot-Video
+Disallow: /
+
+User-agent: Google-Extended
+Disallow: /
+
+# Block OpenAI crawlers
+User-agent: GPTBot
+Disallow: /
+
+User-agent: ChatGPT-User
+Disallow: /
+
+User-agent: CCBot
+Disallow: /
+
+User-agent: anthropic-ai
+Disallow: /
+
+# Block Claude/Anthropic crawlers
+User-agent: Claude-Web
+Disallow: /
+
+User-agent: ClaudeBot
+Disallow: /
+
+# Block Perplexity crawlers
+User-agent: PerplexityBot
+Disallow: /
+
+# Block Bing crawlers
+User-agent: Bingbot
+Disallow: /
+
+User-agent: BingPreview
+Disallow: /
+
+# Block Facebook crawlers
+User-agent: facebookexternalhit
+Disallow: /
+
+User-agent: Facebot
+Disallow: /
+
+# Block Twitter crawlers
+User-agent: Twitterbot
+Disallow: /
+
+User-agent: TweetmemeBot
+Disallow: /
+
+# Block LinkedIn crawlers
+User-agent: LinkedInBot
+Disallow: /
+
+# Block Pinterest crawlers
+User-agent: Pinterestbot
+Disallow: /
+
+# Block Slack crawlers
+User-agent: Slackbot
+Disallow: /
+
+User-agent: Slackbot-LinkExpanding
+Disallow: /
+
+# Block Discord crawlers
+User-agent: Discordbot
+Disallow: /
+
+# Block Apple crawlers
+User-agent: Applebot
+Disallow: /
+
+# Block Baidu crawlers
+User-agent: Baiduspider
+Disallow: /
+
+# Block Yandex crawlers
+User-agent: YandexBot
+Disallow: /
+
+# Block DuckDuckGo crawlers
+User-agent: DuckDuckBot
+Disallow: /
+
+# Block archive crawlers
+User-agent: ia_archiver
+Disallow: /
+
+User-agent: archive.org_bot
+Disallow: /
+
+# Block other common crawlers
+User-agent: AhrefsBot
+Disallow: /
+
+User-agent: SemrushBot
+Disallow: /
+
+User-agent: MJ12bot
+Disallow: /
+
+User-agent: DotBot
+Disallow: /
+
+User-agent: BLEXBot
+Disallow: /
+
+User-agent: PetalBot
+Disallow: /
+
+User-agent: Bytespider
+Disallow: /
+
+User-agent: DataForSeoBot
+Disallow: /
+
+User-agent: MegaIndex
+Disallow: /
+
+# Block all paths explicitly
+Disallow: /
+
+# No sitemap
+# Sitemap:

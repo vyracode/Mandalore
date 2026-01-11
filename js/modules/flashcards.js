@@ -1,11 +1,37 @@
 import { state, bumpSession } from '../state.js';
-import { $, $$, getAssetUrl, hasAsset } from './utils.js';
+import { $, $$ } from './utils.js';
 import getCandidates from '../lib/pinyin-ime.esm.js';
 import { generateWordId } from './wordId.js';
 
 const FRONT_ORDER = ['hanzi', 'pronunciation', 'meaning'];
 const FRONT_LABEL = { hanzi: 'Hanzi', pronunciation: 'Audio', pinyin: 'Pinyin', meaning: 'Meaning' };
 const FRONT_HINT = { hanzi: 'Recognize the word', pronunciation: 'Recognize the sound', pinyin: 'Recognize the spelling', meaning: 'Recall the Mandarin' };
+
+// FlashCardo audio mappings: wordId -> audioNum
+let flashCardoMappings = null;
+
+/**
+ * Load FlashCardo audio mappings from JSON file
+ */
+async function loadFlashCardoMappings() {
+    if (flashCardoMappings !== null) return; // Already loaded
+    try {
+        const response = await fetch('/asset/FlashCardoMappings.json');
+        if (response.ok) {
+            flashCardoMappings = await response.json();
+            console.log(`Loaded ${Object.keys(flashCardoMappings).length} FlashCardo audio mappings`);
+        } else {
+            console.warn('Failed to load FlashCardo mappings:', response.status);
+            flashCardoMappings = {};
+        }
+    } catch (e) {
+        console.error('Error loading FlashCardo mappings:', e);
+        flashCardoMappings = {};
+    }
+}
+
+// Load mappings on module init
+loadFlashCardoMappings();
 
 function speak(text) {
     if (!text) return;
@@ -15,27 +41,46 @@ function speak(text) {
     window.speechSynthesis.speak(u);
 }
 
-function playAudioAsset(wordId, word) {
-    // Try different audio extensions
-    const audioExts = ['mp3', 'wav', 'ogg', 'm4a', 'aac'];
-    for (const ext of audioExts) {
-        const url = getAssetUrl(wordId, word, ext, state.assetCache);
-        if (url) {
-            const audio = new Audio(url);
-            audio.play().catch(e => console.error('Failed to play audio:', e));
-            return true;
-        }
+/**
+ * Play audio for a word using FlashCardo audio if available, otherwise TTS
+ * @param {string} wordId - The word's unique ID
+ * @param {string} word - The Hanzi word (for TTS fallback)
+ * @returns {Promise<boolean>} - True if FlashCardo audio was found and played
+ */
+async function playAudioAsset(wordId, word) {
+    // Ensure mappings are loaded
+    await loadFlashCardoMappings();
+    
+    // Check if wordId exists in FlashCardo mappings
+    if (flashCardoMappings && wordId && flashCardoMappings[wordId]) {
+        const audioNum = flashCardoMappings[wordId];
+        const audioUrl = `https://flashcardo.com/audio/0/${audioNum}.mp3`;
+        const audio = new Audio(audioUrl);
+        audio.play().catch(e => {
+            console.error('Failed to play FlashCardo audio:', e);
+            // Fall back to TTS on error
+            speak(word);
+        });
+        return true;
     }
+    
+    // Debug logging
+    if (wordId && flashCardoMappings) {
+        console.debug(`FlashCardo audio not found for wordId: ${wordId} (word: ${word})`);
+    }
+    
     return false;
 }
 
+/**
+ * Get image URL for a word (placeholder for future image support)
+ * @param {string} wordId - The word's unique ID
+ * @param {string} word - The Hanzi word
+ * @returns {string|null} - Image URL or null if not available
+ */
 function getImageAssetUrl(wordId, word) {
-    // Try different image extensions
-    const imageExts = ['jpg', 'jpeg', 'png', 'webp', 'gif'];
-    for (const ext of imageExts) {
-        const url = getAssetUrl(wordId, word, ext, state.assetCache);
-        if (url) return url;
-    }
+    // No image assets currently available
+    // This function is kept for future image support
     return null;
 }
 
@@ -49,10 +94,10 @@ function createAudioButton(wordId, word, autoplay = false) {
     btn.setAttribute('aria-label', 'Play pronunciation');
     btn.innerHTML = '<div class="waves" aria-hidden="true"><span></span><span></span><span></span><span></span></div>';
     
-    const playAudio = () => {
+    const playAudio = async () => {
         btn.animate([{ transform: 'scale(1)' }, { transform: 'scale(1.03)' }, { transform: 'scale(1)' }], { duration: 220, easing: 'ease-out' });
         // Try asset first, fallback to TTS
-        if (!playAudioAsset(wordId, word)) {
+        if (!(await playAudioAsset(wordId, word))) {
             speak(word);
         }
     };
@@ -318,13 +363,13 @@ function wireSoundButtons(scope = document) {
         if (!(btn instanceof HTMLElement)) return;
         if (btn.dataset.bound === 'true') return;
         btn.dataset.bound = 'true';
-        btn.addEventListener('click', () => {
+        btn.addEventListener('click', async () => {
             btn.animate(
                 [{ transform: 'scale(1)' }, { transform: 'scale(1.03)' }, { transform: 'scale(1)' }],
                 { duration: 220, easing: 'ease-out' }
             );
             // Try asset first, fallback to TTS
-            if (!playAudioAsset(state.card.id, state.card.word)) {
+            if (!(await playAudioAsset(state.card.id, state.card.word))) {
                 speak(state.card.word);
             }
         });

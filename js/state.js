@@ -29,9 +29,7 @@ export const state = {
     imported: { deckName: 'My Wordlist' },
     apiKey: '',
     geminiModel: 'gemini-2.5-flash-lite-preview-06-17',
-    cachedSentences: [], // [ { promptEN, promptZH, feedbackOverview, tokens } ]
-    assetFolder: null, // FileList or null
-    assetCache: {} // { filename: dataUrl } for quick lookup
+    cachedSentences: [] // [ { promptEN, promptZH, feedbackOverview, tokens } ]
 };
 
 const STORAGE_KEY = 'mandalore_state_v1';
@@ -43,35 +41,11 @@ export function saveState() {
             deckName: state.imported.deckName,
             apiKey: state.apiKey,
             geminiModel: state.geminiModel,
-            cachedSentences: state.cachedSentences,
-            assetCache: state.assetCache
+            cachedSentences: state.cachedSentences
         };
-        const jsonStr = JSON.stringify(data);
-        // Check size (localStorage typically has 5-10MB limit)
-        const sizeInMB = new Blob([jsonStr]).size / (1024 * 1024);
-        if (sizeInMB > 4) {
-            console.warn(`State size is ${sizeInMB.toFixed(2)}MB, may exceed localStorage limit`);
-        }
-        localStorage.setItem(STORAGE_KEY, jsonStr);
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
     } catch (e) {
         console.error('Failed to save state', e);
-        // If quota exceeded, try to save without assetCache
-        if (e.name === 'QuotaExceededError' || e.code === 22) {
-            console.warn('localStorage quota exceeded, attempting to save without assetCache');
-            try {
-                const dataWithoutAssets = {
-                    wordlist: state.wordlist,
-                    deckName: state.imported.deckName,
-                    apiKey: state.apiKey,
-                    geminiModel: state.geminiModel,
-                    cachedSentences: state.cachedSentences
-                };
-                localStorage.setItem(STORAGE_KEY, JSON.stringify(dataWithoutAssets));
-                console.warn('Saved state without assets due to storage limit');
-            } catch (e2) {
-                console.error('Failed to save state even without assets', e2);
-            }
-        }
     }
 }
 
@@ -89,13 +63,6 @@ export function loadState() {
         if (data.apiKey) state.apiKey = data.apiKey;
         if (data.geminiModel) state.geminiModel = data.geminiModel;
         if (Array.isArray(data.cachedSentences)) state.cachedSentences = data.cachedSentences;
-        if (data.assetCache && typeof data.assetCache === 'object') {
-            state.assetCache = data.assetCache;
-            const assetCount = Object.keys(state.assetCache).length;
-            console.log(`Loaded ${assetCount} assets from storage`);
-        } else {
-            state.assetCache = {};
-        }
         return true;
     } catch (e) {
         console.error('Failed to load state', e);

@@ -1,6 +1,6 @@
 import { state, saveState } from '../state.js';
 import { $, $$ } from './utils.js';
-import { nextCard, renderFront, resetAllBack } from './flashcards.js';
+import { nextCard } from './flashcards.js';
 import { prompts } from './prompts.js';
 import { generateWordId } from './wordId.js';
 
@@ -371,110 +371,6 @@ export async function handleFileSelect(event) {
 
     // Reset file input
     event.target.value = '';
-}
-
-// --- Asset Folder Management ---
-
-export function renderAssetStatus() {
-    const s = $('#assetStatus');
-    if (s) {
-        const count = Object.keys(state.assetCache || {}).length;
-        if (count > 0) {
-            s.textContent = `${count} files`;
-            s.style.color = 'var(--green)';
-        } else {
-            s.textContent = 'Not set';
-            s.style.color = 'var(--text-muted)';
-        }
-    }
-}
-
-async function cacheAssetFiles(files) {
-    state.assetCache = {};
-    const audioExts = ['mp3', 'wav', 'ogg', 'm4a', 'aac'];
-    const imageExts = ['jpg', 'jpeg', 'png', 'webp', 'gif'];
-    
-    let totalSize = 0;
-    let cachedCount = 0;
-    
-    for (const file of files) {
-        const ext = file.name.split('.').pop()?.toLowerCase();
-        if (!ext) continue;
-        
-        // Only cache audio and image files
-        if (!audioExts.includes(ext) && !imageExts.includes(ext)) continue;
-        
-        try {
-            const dataUrl = await readFileAsDataUrl(file);
-            const size = dataUrl.length;
-            totalSize += size;
-            
-            // Store by lowercase filename for consistency (getAssetUrl handles case-insensitive lookup)
-            const key = file.name.toLowerCase();
-            state.assetCache[key] = dataUrl;
-            cachedCount++;
-        } catch (e) {
-            console.error(`Failed to cache ${file.name}:`, e);
-        }
-    }
-    
-    const sizeInMB = totalSize / (1024 * 1024);
-    console.log(`Cached ${cachedCount} assets, total size: ${sizeInMB.toFixed(2)}MB`);
-    
-    // Try to save state
-    try {
-        saveState();
-        renderAssetStatus();
-    } catch (e) {
-        console.error('Failed to save assets to localStorage:', e);
-        if (e.name === 'QuotaExceededError' || e.code === 22) {
-            alert(`Warning: Asset cache is too large (${sizeInMB.toFixed(2)}MB) and exceeds browser storage limits. Assets may not persist after page reload.`);
-        }
-    }
-}
-
-function readFileAsDataUrl(file) {
-    return new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve(reader.result);
-        reader.onerror = reject;
-        reader.readAsDataURL(file);
-    });
-}
-
-export function triggerAssetFolderSelect() {
-    const input = $('#assetFolderInput');
-    if (input) input.click();
-}
-
-export async function handleAssetFolderSelect(event) {
-    const files = Array.from(event.target.files || []);
-    if (files.length === 0) return;
-    
-    await cacheAssetFiles(files);
-    
-    // Refresh current card to show assets
-    if (state.card.word) {
-        renderFront();
-        resetAllBack();
-    }
-    
-    // Reset input
-    event.target.value = '';
-}
-
-export function clearAssets() {
-    if (!confirm('Clear all cached assets?')) return;
-    state.assetCache = {};
-    state.assetFolder = null;
-    saveState();
-    renderAssetStatus();
-    
-    // Refresh current card
-    if (state.card.word) {
-        renderFront();
-        resetAllBack();
-    }
 }
 
 // --- PWA Installation ---

@@ -103,6 +103,9 @@ function xxHash32(input, seed = 0) {
     h32 ^= h32 >>> 13;
     h32 = Math.imul(h32, PRIME32_3) >>> 0;
     h32 ^= h32 >>> 16;
+    
+    // Ensure unsigned 32-bit before converting to hex
+    h32 = h32 >>> 0;
 
     // Return as hex string (8 characters, zero-padded)
     return h32.toString(16).padStart(8, '0');

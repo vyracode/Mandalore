@@ -157,6 +157,8 @@ function resetModality(modCard) {
     $$('[data-role$="Answer"]', modCard).forEach(a => { a.style.display = 'none'; a.innerHTML = ''; });
     $$('[data-role$="Self"]', modCard).forEach(s => { s.style.display = 'none'; });
     $$('.selfgrade', modCard).forEach(s => { s.style.display = 'none'; });
+    // Remove any cover buttons (for Look, Cover, Write, Check, Repeat)
+    $$('[data-action="coverPinyin"]', modCard).forEach(btn => btn.remove());
 
     // clear hanzi grades
     $$('[data-choice]', modCard).forEach(b => { delete b.dataset.grade; });
@@ -256,7 +258,7 @@ function checkSpeech(modCard) {
     if (sg) sg.style.display = 'flex';
 }
 
-// Pinyin spelling
+// Pinyin spelling - Look, Cover, Write, Check, Repeat
 function checkPinyin(modCard) {
     const inputEl = $('[data-input="pinyin"]', modCard);
     const ans = $('[data-role="pinyinAnswer"]', modCard);
@@ -265,11 +267,50 @@ function checkPinyin(modCard) {
     const input = inputEl.value.trim().toLowerCase();
     const correct = state.card.pinyinBare || '';
     const ok = (input === correct);
-    showResult(modCard, ok, ok ? 'Right' : 'Wrong', 'pinyin');
-    bumpSession(ok ? 1 : 0);
+    
+    if (ok) {
+        // Correct! Show success and bump session
+        showResult(modCard, ok, 'Right', 'pinyin');
+        bumpSession(1);
+        ans.style.display = 'block';
+        ans.innerHTML = `<strong>Answer:</strong> <span>${correct}</span>`;
+        // Remove any cover button if it exists
+        const coverBtn = $('[data-action="coverPinyin"]', modCard);
+        if (coverBtn) coverBtn.remove();
+    } else {
+        // Wrong - Show answer with "Cover" button for Look, Cover, Write, Check, Repeat
+        showResult(modCard, ok, 'Wrong', 'pinyin');
+        ans.style.display = 'block';
+        ans.innerHTML = `
+            <div style="margin-bottom: 8px;"><strong>Answer:</strong> <span>${correct}</span></div>
+            <button class="btn" data-action="coverPinyin" type="button">Cover</button>
+        `;
+        // Don't bump session yet - wait until they get it right
+    }
+}
 
-    ans.style.display = 'block';
-    ans.innerHTML = `<strong>Answer:</strong> <span>${correct}</span>`;
+// Cover the answer and allow retry (Look, Cover, Write, Check, Repeat)
+function coverPinyin(modCard) {
+    const inputEl = $('[data-input="pinyin"]', modCard);
+    const ans = $('[data-role="pinyinAnswer"]', modCard);
+    const coverBtn = $('[data-action="coverPinyin"]', modCard);
+    
+    if (inputEl) {
+        inputEl.value = ''; // Clear input for retry
+        inputEl.focus(); // Focus the input
+    }
+    if (ans) {
+        ans.style.display = 'none'; // Hide the answer
+    }
+    if (coverBtn) {
+        coverBtn.remove(); // Remove cover button
+    }
+    // Clear the result display
+    const result = $('[data-role="pinyinResult"]', modCard);
+    if (result) {
+        result.style.display = 'none';
+        result.classList.remove('good', 'bad');
+    }
 }
 
 // Hanzi: pick
@@ -332,6 +373,7 @@ export function bindModality(modCard) {
         if (t.matches('[data-action="checkTone"]')) return checkTone(modCard);
         if (t.matches('[data-action="checkSpeech"]')) return checkSpeech(modCard);
         if (t.matches('[data-action="checkPinyin"]')) return checkPinyin(modCard);
+        if (t.matches('[data-action="coverPinyin"]')) return coverPinyin(modCard);
         if (t.matches('[data-action="checkMeaning"]')) return checkMeaning(modCard);
 
         if (t.matches('[data-action="selfRight"]')) {

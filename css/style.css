@@ -528,11 +528,193 @@ nav {
     box-shadow: 0 0 0 3px rgba(255, 79, 216, .16)
 }
 
+/* =====================================================
+   STATE-BASED MOD-CARD SYSTEM
+   Cards have data-state="input" (default) or "checked"
+   ===================================================== */
+
+/* Hide checked content by default (input state) */
+.mod-card[data-state="input"] .mod-checked,
+.pron-block[data-pron-state="input"] .mod-checked {
+    display: none;
+}
+
+/* Hide input content when checked */
+.mod-card[data-state="checked"] .mod-input,
+.pron-block[data-pron-state="checked"] .mod-input {
+    display: none;
+}
+
+/* Show checked content when checked */
+.mod-card[data-state="checked"] .mod-checked,
+.pron-block[data-pron-state="checked"] .mod-checked {
+    display: flex;
+}
+
+/* Checked row: horizontal layout for result + answer + actions */
+.checked-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-height: 40px;
+}
+
+/* Compact result indicator (inline) */
+.checked-result {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 10px;
+    border-radius: 10px;
+    background: rgba(0, 0, 0, .18);
+    border: 1px solid rgba(255, 255, 255, .10);
+    font-family: "Google Sans", system-ui, -apple-system, sans-serif;
+    font-weight: 950;
+    font-size: 12px;
+    flex-shrink: 0;
+}
+
+.checked-result .r-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 99px;
+}
+
+.checked-result.good {
+    border-color: rgba(42, 245, 154, .3);
+}
+
+.checked-result.good .r-dot {
+    background: var(--green);
+    box-shadow: 0 0 0 2px rgba(42, 245, 154, .2);
+}
+
+.checked-result.bad {
+    border-color: rgba(255, 79, 216, .3);
+}
+
+.checked-result.bad .r-dot {
+    background: var(--pink);
+    box-shadow: 0 0 0 2px rgba(255, 79, 216, .2);
+}
+
+/* Compact result in header (for hanzi) */
+.checked-result.compact {
+    display: none;
+    padding: 4px 8px;
+    font-size: 11px;
+}
+
+.checked-result.compact .r-dot {
+    width: 6px;
+    height: 6px;
+}
+
+.mod-card[data-state="checked"] .checked-result.compact {
+    display: flex;
+}
+
+/* Result that appears after self-grading (meaning, speech) */
+/* Hidden by default, shown only when graded (good/bad class) AND in checked state */
+.mod-body > .checked-result,
+.pron-block > .checked-result {
+    display: none;
+}
+
+.mod-card[data-state="checked"] > .mod-body > .checked-result.good,
+.mod-card[data-state="checked"] > .mod-body > .checked-result.bad,
+.pron-block[data-pron-state="checked"] > .checked-result.good,
+.pron-block[data-pron-state="checked"] > .checked-result.bad {
+    display: flex;
+}
+
+/* Answer text inline */
+.checked-answer {
+    flex: 1;
+    font-weight: 850;
+    font-size: 14px;
+    color: rgba(255, 255, 255, .86);
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.checked-answer strong {
+    font-family: "Google Sans", system-ui, -apple-system, sans-serif;
+    font-weight: 950;
+}
+
+/* Compact grade buttons (checkmark/X) */
+.checked-grade {
+    display: flex;
+    gap: 6px;
+    flex-shrink: 0;
+}
+
+.btn-grade {
+    width: 36px;
+    height: 36px;
+    border-radius: 10px;
+    border: 1px solid rgba(255, 255, 255, .12);
+    background: rgba(0, 0, 0, .18);
+    color: rgba(255, 255, 255, .7);
+    font-size: 16px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all .15s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.btn-grade:hover {
+    background: rgba(255, 255, 255, .08);
+}
+
+.btn-grade.good:hover {
+    background: rgba(42, 245, 154, .2);
+    border-color: rgba(42, 245, 154, .4);
+    color: var(--green);
+}
+
+.btn-grade.bad:hover {
+    background: rgba(255, 79, 216, .2);
+    border-color: rgba(255, 79, 216, .4);
+    color: var(--pink);
+}
+
+.btn-grade:disabled {
+    opacity: .4;
+    cursor: not-allowed;
+}
+
+/* Audio in checked state */
+.checked-audio {
+    flex: 1;
+    min-width: 0;
+}
+
+.checked-audio .front-audio {
+    padding: 0;
+}
+
+/* Cover button styling */
+[data-role="pinyinCover"] {
+    flex-shrink: 0;
+}
+
+/* Hide cover button when correct */
+.mod-card[data-state="checked"].is-correct [data-role="pinyinCover"] {
+    display: none;
+}
+
+/* Legacy styles kept for compatibility */
 .selfgrade {
     display: none;
 }
 
-/* Audio reveal (reuse front audio UI inside cards) */
+/* Audio reveal (legacy, kept for compatibility) */
 .audio-reveal {
     display: none;
     width: 100%;

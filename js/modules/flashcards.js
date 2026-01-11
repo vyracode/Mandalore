@@ -214,17 +214,34 @@ export function renderFront() {
 
 function resetModality(modCard) {
     if (!modCard) return;
-    $$('[data-choice]', modCard).forEach(b => b.dataset.picked = 'false');
+    
+    // Reset state to input
+    modCard.dataset.state = 'input';
+    modCard.classList.remove('is-correct');
+    
+    // Reset pron-block states
+    $$('.pron-block', modCard).forEach(block => {
+        block.dataset.pronState = 'input';
+    });
+    
+    // Clear inputs and choices
+    $$('[data-choice]', modCard).forEach(b => {
+        b.dataset.picked = 'false';
+        delete b.dataset.grade;
+    });
     $$('input', modCard).forEach(i => { i.value = ''; });
-    $$('[data-role$="Result"]', modCard).forEach(r => { r.style.display = 'none'; r.classList.remove('good', 'bad'); });
-    $$('[data-role$="Answer"]', modCard).forEach(a => { a.style.display = 'none'; a.innerHTML = ''; });
-    $$('[data-role$="Self"]', modCard).forEach(s => { s.style.display = 'none'; });
-    $$('.selfgrade', modCard).forEach(s => { s.style.display = 'none'; });
-    // Remove any cover buttons (for Look, Cover, Write, Check, Repeat)
-    $$('[data-action="coverPinyin"]', modCard).forEach(btn => btn.remove());
-
-    // clear hanzi grades
-    $$('[data-choice]', modCard).forEach(b => { delete b.dataset.grade; });
+    
+    // Clear result indicators
+    $$('.checked-result', modCard).forEach(r => { 
+        r.classList.remove('good', 'bad'); 
+    });
+    
+    // Clear answer content
+    $$('.checked-answer', modCard).forEach(a => { a.innerHTML = ''; });
+    $$('.checked-audio', modCard).forEach(a => { a.innerHTML = ''; });
+    
+    // Re-enable grade buttons
+    $$('.btn-grade', modCard).forEach(btn => { btn.disabled = false; });
 
     // If hanzi mod, repopulate choices using IME
     if (modCard.id === 'modHanzi' && state.card.word && state.card.pinyinBare) {
@@ -285,7 +302,6 @@ function showResult(modCard, ok, msg, role) {
     const result = modCard ? $(`[data-role="${role}Result"]`, modCard) : null;
     const textEl = modCard ? $(`[data-role="${role}Msg"]`, modCard) : null;
     if (!result) return;
-    result.style.display = 'flex';
     result.classList.toggle('good', !!ok);
     result.classList.toggle('bad', !ok);
     if (textEl) textEl.textContent = msg;
@@ -313,36 +329,41 @@ function wireSoundButtons(scope = document) {
 function checkTone(modCard) {
     const inputEl = $('[data-input="tone"]', modCard);
     const ans = $('[data-role="toneAnswer"]', modCard);
-    if (!inputEl || !ans) return;
+    const toneBlock = $('.pron-tone', modCard);
+    if (!inputEl || !ans || !toneBlock) return;
 
     const input = inputEl.value.trim().replace(/\\s+/g, '');
     const correct = state.card.tones || '';
     const ok = (input === correct);
+    
+    // Switch to checked state
+    toneBlock.dataset.pronState = 'checked';
+    
     showResult(modCard, ok, ok ? 'Right' : 'Wrong', 'tone');
     bumpSession(ok ? 1 : 0);
 
-    ans.style.display = 'block';
-    ans.innerHTML = `<strong>Tones:</strong> <span>${correct}</span>`;
+    ans.innerHTML = `<strong>Tones:</strong> ${correct}`;
 }
 
 // Pronunciation: Speak
 function checkSpeech(modCard) {
-    const a = $('[data-role="speechAnswer"]', modCard);
-    const sg = $('[data-role="speechSelf"]', modCard);
-    if (a) {
-        a.style.display = 'block';
-        a.innerHTML = '';
-        // Use createAudioButton with autoplay for reveal
-        const audioWrap = createAudioButton(state.card.word, true);
-        // Update label - find the text div (second child div)
-        const divs = audioWrap.querySelectorAll('div');
-        if (divs.length > 1) {
-            const labelDiv = divs[1]; // Second div is the label container
-            labelDiv.innerHTML = `<div style="font-family:'Google Sans',system-ui,-apple-system,sans-serif; font-weight:950; font-size:16px; letter-spacing:.2px">Example audio</div><div style="margin-top:4px; color: rgba(255,255,255,.65); font-family:'Google Sans',system-ui,-apple-system,sans-serif; font-weight:800; font-size:12px">Tap to play</div>`;
-        }
-        a.appendChild(audioWrap);
+    const audioContainer = $('[data-role="speechAnswer"]', modCard);
+    const speakBlock = $('.pron-speak', modCard);
+    if (!audioContainer || !speakBlock) return;
+    
+    // Switch to checked state
+    speakBlock.dataset.pronState = 'checked';
+    
+    // Create audio button with autoplay
+    audioContainer.innerHTML = '';
+    const audioWrap = createAudioButton(state.card.word, true);
+    // Compact label
+    const divs = audioWrap.querySelectorAll('div');
+    if (divs.length > 1) {
+        const labelDiv = divs[1];
+        labelDiv.innerHTML = `<div style="font-family:'Google Sans',system-ui,-apple-system,sans-serif; font-weight:950; font-size:14px">Listen</div>`;
     }
-    if (sg) sg.style.display = 'flex';
+    audioContainer.appendChild(audioWrap);
 }
 
 // Pinyin spelling - Look, Cover, Write, Check, Repeat
@@ -355,47 +376,35 @@ function checkPinyin(modCard) {
     const correct = state.card.pinyinBare || '';
     const ok = (input === correct);
     
+    // Switch to checked state
+    modCard.dataset.state = 'checked';
+    
+    showResult(modCard, ok, ok ? 'Right' : 'Wrong', 'pinyin');
+    ans.innerHTML = `<strong>Answer:</strong> ${correct}`;
+    
     if (ok) {
-        // Correct! Show success and bump session
-        showResult(modCard, ok, 'Right', 'pinyin');
+        modCard.classList.add('is-correct');
         bumpSession(1);
-        ans.style.display = 'block';
-        ans.innerHTML = `<strong>Answer:</strong> <span>${correct}</span>`;
-        // Remove any cover button if it exists
-        const coverBtn = $('[data-action="coverPinyin"]', modCard);
-        if (coverBtn) coverBtn.remove();
-    } else {
-        // Wrong - Show answer with "Cover" button for Look, Cover, Write, Check, Repeat
-        showResult(modCard, ok, 'Wrong', 'pinyin');
-        ans.style.display = 'block';
-        ans.innerHTML = `
-            <div style="margin-bottom: 8px;"><strong>Answer:</strong> <span>${correct}</span></div>
-            <button class="btn" data-action="coverPinyin" type="button">Cover</button>
-        `;
-        // Don't bump session yet - wait until they get it right
     }
+    // If wrong, Cover button is visible and allows retry
 }
 
 // Cover the answer and allow retry (Look, Cover, Write, Check, Repeat)
 function coverPinyin(modCard) {
     const inputEl = $('[data-input="pinyin"]', modCard);
-    const ans = $('[data-role="pinyinAnswer"]', modCard);
-    const coverBtn = $('[data-action="coverPinyin"]', modCard);
     
+    // Switch back to input state
+    modCard.dataset.state = 'input';
+    
+    // Clear input for retry
     if (inputEl) {
-        inputEl.value = ''; // Clear input for retry
-        inputEl.focus(); // Focus the input
+        inputEl.value = '';
+        inputEl.focus();
     }
-    if (ans) {
-        ans.style.display = 'none'; // Hide the answer
-    }
-    if (coverBtn) {
-        coverBtn.remove(); // Remove cover button
-    }
-    // Clear the result display
+    
+    // Clear result indicator
     const result = $('[data-role="pinyinResult"]', modCard);
     if (result) {
-        result.style.display = 'none';
         result.classList.remove('good', 'bad');
     }
 }
@@ -423,55 +432,41 @@ function pickHanzi(modCard, btn) {
         if (correctBtn) correctBtn.dataset.grade = 'correct';
     }
 
+    // Switch to checked state (shows result in header)
+    modCard.dataset.state = 'checked';
     showResult(modCard, ok, ok ? 'Right' : 'Wrong', 'hanzi');
     bumpSession(ok ? 1 : 0);
-
-    const ans = $('[data-role="hanziAnswer"]', modCard);
-    if (ans) {
-        ans.style.display = 'block';
-        ans.innerHTML = `<strong>Answer:</strong> <span style="font-size:18px">${correctText}</span>`;
-    }
 }
 
 // Meaning: check then self-grade
 function checkMeaning(modCard) {
     const ans = $('[data-role="meaningAnswer"]', modCard);
-    const sg = $('[data-role="meaningSelf"]', modCard);
-    if (ans) {
-        ans.style.display = 'block';
-        
-        const container = document.createElement('div');
-        container.style.display = 'flex';
-        container.style.alignItems = 'center';
-        container.style.gap = '16px';
-        
-        const textDiv = document.createElement('div');
-        textDiv.innerHTML = `<strong>Answer:</strong> ${state.card.meaning}`;
-        container.appendChild(textDiv);
-        
-        // Add image if available
-        const imageUrl = getImageAssetUrl(state.card.word);
-        if (imageUrl) {
-            const img = document.createElement('img');
-            img.src = imageUrl;
-            img.style.maxWidth = '120px';
-            img.style.maxHeight = '120px';
-            img.style.borderRadius = '12px';
-            img.style.objectFit = 'cover';
-            img.style.border = '1px solid rgba(255, 255, 255, .12)';
-            img.alt = state.card.meaning;
-            container.appendChild(img);
-        }
-        
-        ans.innerHTML = '';
-        ans.appendChild(container);
+    if (!ans) return;
+    
+    // Switch to checked state
+    modCard.dataset.state = 'checked';
+    
+    // Build answer content
+    let content = `<strong>${state.card.meaning}</strong>`;
+    
+    // Add image thumbnail if available
+    const imageUrl = getImageAssetUrl(state.card.word);
+    if (imageUrl) {
+        content = `<img src="${imageUrl}" alt="" style="width:28px; height:28px; border-radius:6px; object-fit:cover; margin-right:8px; vertical-align:middle" />${content}`;
     }
-    if (sg) sg.style.display = 'flex';
+    
+    ans.innerHTML = content;
 }
 
 function selfGrade(modCard, ok, role) {
     showResult(modCard, ok, ok ? 'Right' : 'Wrong', role);
     bumpSession(ok ? 1 : 0);
+    
+    // Disable grade buttons after selection
+    const selfContainer = $(`[data-role="${role}Self"]`, modCard);
+    if (selfContainer) {
+        $$('.btn-grade', selfContainer).forEach(btn => { btn.disabled = true; });
+    }
 }
 
 export function bindModality(modCard) {

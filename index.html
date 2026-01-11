@@ -62,35 +62,42 @@
                         <div class="mod" id="modStack">
 
                             <!-- Meaning (self-grade after check) -->
-                            <div class="mod-card" data-mod="meaning" id="modMeaning">
+                            <div class="mod-card" data-mod="meaning" data-state="input" id="modMeaning">
                                 <div class="mod-head">
                                     <div class="chip"><span class="mini"
                                             style="background: var(--orange); box-shadow: 0 0 0 3px rgba(255,176,32,.14)"
                                             aria-hidden="true"></span> Meaning</div>
                                     <div class="mod-actions">
-                                        <button class="btn" data-action="checkMeaning" type="button">Check</button>
+                                        <button class="btn mod-input" data-action="checkMeaning" type="button">Check</button>
                                     </div>
                                 </div>
-                                <div class="mod-body">
-                                    <div class="answer" data-role="meaningAnswer"></div>
-                                    <div class="result" data-role="meaningResult"><span class="r-dot"
-                                            aria-hidden="true"></span><span data-role="meaningMsg">Right</span></div>
-                                    <div class="row selfgrade" data-role="meaningSelf">
-                                        <button class="btn good" data-action="selfRight" type="button"
-                                            style="flex:1">Right</button>
-                                        <button class="btn bad" data-action="selfWrong" type="button"
-                                            style="flex:1">Wrong</button>
+                                <div class="mod-body mod-checked">
+                                    <div class="checked-row">
+                                        <div class="checked-answer" data-role="meaningAnswer"></div>
+                                        <div class="checked-grade" data-role="meaningSelf">
+                                            <button class="btn-grade good" data-action="selfRight" type="button" aria-label="Right">✓</button>
+                                            <button class="btn-grade bad" data-action="selfWrong" type="button" aria-label="Wrong">✗</button>
+                                        </div>
+                                    </div>
+                                    <div class="checked-result" data-role="meaningResult">
+                                        <span class="r-dot" aria-hidden="true"></span>
+                                        <span data-role="meaningMsg"></span>
                                     </div>
                                 </div>
                             </div>
 
                             <!-- Hanzi (multiple choice) -->
-                            <div class="mod-card" data-mod="hanzi" id="modHanzi">
+                            <div class="mod-card" data-mod="hanzi" data-state="input" id="modHanzi">
                                 <div class="mod-head">
                                     <div class="chip"><span class="mini"
                                             style="background: var(--cyan); box-shadow: 0 0 0 3px rgba(40,216,255,.14)"
                                             aria-hidden="true"></span> Hanzi</div>
-                                    <div class="mod-actions"></div>
+                                    <div class="mod-actions">
+                                        <div class="checked-result compact" data-role="hanziResult">
+                                            <span class="r-dot" aria-hidden="true"></span>
+                                            <span data-role="hanziMsg"></span>
+                                        </div>
+                                    </div>
                                 </div>
                                 <div class="mod-body">
                                     <div class="choices" role="group" aria-label="Hanzi choices">
@@ -101,14 +108,11 @@
                                         <button class="choice" data-choice type="button">欢迎吧</button>
                                         <button class="choice" data-choice type="button">欢影</button>
                                     </div>
-                                    <div class="result" data-role="hanziResult"><span class="r-dot"
-                                            aria-hidden="true"></span><span data-role="hanziMsg">Right</span></div>
-                                    <div class="answer" data-role="hanziAnswer"></div>
                                 </div>
                             </div>
 
                             <!-- Pinyin spelling (graded) -->
-                            <div class="mod-card" data-mod="pinyin" id="modPinyin">
+                            <div class="mod-card" data-mod="pinyin" data-state="input" id="modPinyin">
                                 <div class="mod-head">
                                     <div class="chip"><span class="mini"
                                             style="background: var(--purple); box-shadow: 0 0 0 3px rgba(122,92,255,.14)"
@@ -116,57 +120,66 @@
                                     <div class="mod-actions"></div>
                                 </div>
                                 <div class="mod-body">
-                                    <div class="row">
+                                    <div class="row mod-input">
                                         <input class="field" inputmode="latin" type="text" enterkeyhint="go"
                                             autocapitalize="none" autocorrect="off" placeholder="pinyin (no tones)" 
                                             data-input="pinyin" aria-label="Pinyin spelling" />
                                         <button class="btn" data-action="checkPinyin" type="button">Check</button>
                                     </div>
-                                    <div class="result" data-role="pinyinResult"><span class="r-dot"
-                                            aria-hidden="true"></span><span data-role="pinyinMsg">Right</span></div>
-                                    <div class="answer" data-role="pinyinAnswer"></div>
+                                    <div class="checked-row mod-checked">
+                                        <div class="checked-result" data-role="pinyinResult">
+                                            <span class="r-dot" aria-hidden="true"></span>
+                                            <span data-role="pinyinMsg"></span>
+                                        </div>
+                                        <div class="checked-answer" data-role="pinyinAnswer"></div>
+                                        <button class="btn" data-action="coverPinyin" data-role="pinyinCover" type="button">Cover</button>
+                                    </div>
                                 </div>
                             </div>
 
                             <!-- Pronunciation -->
-                            <div class="mod-card" data-mod="pronunciation" id="modPron">
+                            <div class="mod-card" data-mod="pronunciation" data-state="input" id="modPron">
                                 <div class="mod-head">
                                     <div class="chip"><span class="mini" aria-hidden="true"></span> Pronunciation</div>
                                     <div class="mod-actions"></div>
                                 </div>
 
                                 <div class="mod-body pron">
-                                    <div class="pron-block pron-tone">
-                                        <div class="row" style="justify-content:space-between">
+                                    <div class="pron-block pron-tone" data-pron-state="input">
+                                        <div class="row mod-input" style="justify-content:space-between">
                                             <input class="field" inputmode="numeric" type="tel" enterkeyhint="go"
                                                 pattern="[0-9]*" autocorrect="off" placeholder="tone numbers" 
                                                 data-input="tone" aria-label="Tone numbers" />
                                             <button class="btn" data-action="checkTone" type="button">Check</button>
                                         </div>
-
-                                        <div class="result" data-role="toneResult"><span class="r-dot"
-                                                aria-hidden="true"></span><span data-role="toneMsg">Right</span></div>
-                                        <div class="answer" data-role="toneAnswer"></div>
+                                        <div class="checked-row mod-checked">
+                                            <div class="checked-result" data-role="toneResult">
+                                                <span class="r-dot" aria-hidden="true"></span>
+                                                <span data-role="toneMsg"></span>
+                                            </div>
+                                            <div class="checked-answer" data-role="toneAnswer"></div>
+                                        </div>
                                     </div>
 
                                     <div class="pron-divider" aria-hidden="true"></div>
 
-                                    <div class="pron-block pron-speak">
-                                        <div class="row" style="justify-content:space-between">
+                                    <div class="pron-block pron-speak" data-pron-state="input">
+                                        <div class="row mod-input" style="justify-content:space-between">
                                             <div class="chip" style="background: rgba(0,0,0,.12)"><span class="mini"
                                                     style="background: var(--cyan); box-shadow: 0 0 0 3px rgba(40,216,255,.14)"
                                                     aria-hidden="true"></span> Say it out loud</div>
                                             <button class="btn" data-action="checkSpeech" type="button">Check</button>
                                         </div>
-
-                                        <div class="audio-reveal" data-role="speechAnswer"></div>
-                                        <div class="result" data-role="speechResult"><span class="r-dot"
-                                                aria-hidden="true"></span><span data-role="speechMsg">Right</span></div>
-
-                                        <div class="row selfgrade pron-self" data-role="speechSelf">
-                                            <button class="btn good" data-action="selfRight"
-                                                type="button">Right</button>
-                                            <button class="btn bad" data-action="selfWrong" type="button">Wrong</button>
+                                        <div class="checked-row mod-checked">
+                                            <div class="checked-audio" data-role="speechAnswer"></div>
+                                            <div class="checked-grade" data-role="speechSelf">
+                                                <button class="btn-grade good" data-action="selfRight" type="button" aria-label="Right">✓</button>
+                                                <button class="btn-grade bad" data-action="selfWrong" type="button" aria-label="Wrong">✗</button>
+                                            </div>
+                                        </div>
+                                        <div class="checked-result" data-role="speechResult">
+                                            <span class="r-dot" aria-hidden="true"></span>
+                                            <span data-role="speechMsg"></span>
                                         </div>
                                     </div>
                                 </div>

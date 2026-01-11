@@ -148,16 +148,14 @@ nav {
     color: var(--muted);
 }
 
-/* Floating Next (Flashcards) */
-.fab-next {
-    position: fixed;
-    right: 12px;
-    bottom: calc(92px + 14px + env(safe-area-inset-bottom));
-    height: 54px;
-    padding: 0 18px;
-    border-radius: 18px;
-    z-index: 30;
-    box-shadow: 0 22px 60px rgba(0, 0, 0, .45), inset 0 1px 0 rgba(255, 255, 255, .10);
+/* Next button in front card header */
+.btn-next-header {
+    height: 28px;
+    padding: 0 12px;
+    border-radius: 14px;
+    font-size: 12px;
+    font-weight: 900;
+    flex-shrink: 0;
 }
 
 .seg {
@@ -252,8 +250,8 @@ nav {
 }
 
 .front-card {
-    flex: 0 0 180px;
-    min-height: 180px;
+    flex: 0 0 120px;
+    min-height: 120px;
     border-radius: 22px;
     background:
         radial-gradient(600px 250px at 20% 0%, rgba(255, 79, 216, .22), transparent 55%),
@@ -262,11 +260,11 @@ nav {
     border: 1px solid rgba(255, 255, 255, .12);
     box-shadow: 0 18px 46px rgba(0, 0, 0, .45), inset 0 1px 0 rgba(255, 255, 255, .10);
     overflow: hidden;
-    padding: 14px;
+    padding: 10px 14px;
     display: flex;
     flex-direction: column;
     justify-content: space-between;
-    gap: 12px;
+    gap: 8px;
 }
 
 .front-top {
@@ -307,7 +305,7 @@ nav {
     text-align: center;
     flex: 1;
     min-height: 0;
-    padding: 6px 8px;
+    padding: 4px 8px;
 }
 
 .front-hanzi {
@@ -1146,11 +1144,7 @@ textarea:focus-visible {
     }
 
     .front-card {
-        flex-basis: 210px;
-        min-height: 210px
-    }
-
-    .fab-next {
-        right: 18px
+        flex-basis: 140px;
+        min-height: 140px
     }
 }

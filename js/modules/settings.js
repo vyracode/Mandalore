@@ -2,6 +2,7 @@ import { state, saveState } from '../state.js';
 import { $, $$ } from './utils.js';
 import { nextCard, renderFront, resetAllBack } from './flashcards.js';
 import { prompts } from './prompts.js';
+import { sanitizeWordName } from './utils.js';
 
 export function renderKeyStatus() {
     const s = $('#keyStatus');
@@ -331,4 +332,90 @@ export async function handleFileSelect(event) {
 
     // Reset file input
     event.target.value = '';
+}
+
+// --- Asset Folder Management ---
+
+export function renderAssetStatus() {
+    const s = $('#assetStatus');
+    if (s) {
+        const count = Object.keys(state.assetCache || {}).length;
+        if (count > 0) {
+            s.textContent = `${count} files`;
+            s.style.color = 'var(--green)';
+        } else {
+            s.textContent = 'Not set';
+            s.style.color = 'var(--text-muted)';
+        }
+    }
+}
+
+async function cacheAssetFiles(files) {
+    state.assetCache = {};
+    const audioExts = ['mp3', 'wav', 'ogg', 'm4a', 'aac'];
+    const imageExts = ['jpg', 'jpeg', 'png', 'webp', 'gif'];
+    
+    for (const file of files) {
+        const ext = file.name.split('.').pop()?.toLowerCase();
+        if (!ext) continue;
+        
+        // Only cache audio and image files
+        if (!audioExts.includes(ext) && !imageExts.includes(ext)) continue;
+        
+        try {
+            const dataUrl = await readFileAsDataUrl(file);
+            // Store by filename (case-insensitive lookup handled in getAssetUrl)
+            state.assetCache[file.name] = dataUrl;
+            state.assetCache[file.name.toLowerCase()] = dataUrl;
+        } catch (e) {
+            console.error(`Failed to cache ${file.name}:`, e);
+        }
+    }
+    
+    saveState();
+    renderAssetStatus();
+}
+
+function readFileAsDataUrl(file) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+    });
+}
+
+export function triggerAssetFolderSelect() {
+    const input = $('#assetFolderInput');
+    if (input) input.click();
+}
+
+export async function handleAssetFolderSelect(event) {
+    const files = Array.from(event.target.files || []);
+    if (files.length === 0) return;
+    
+    await cacheAssetFiles(files);
+    
+    // Refresh current card to show assets
+    if (state.card.word) {
+        renderFront();
+        resetAllBack();
+    }
+    
+    // Reset input
+    event.target.value = '';
+}
+
+export function clearAssets() {
+    if (!confirm('Clear all cached assets?')) return;
+    state.assetCache = {};
+    state.assetFolder = null;
+    saveState();
+    renderAssetStatus();
+    
+    // Refresh current card
+    if (state.card.word) {
+        renderFront();
+        resetAllBack();
+    }
 }

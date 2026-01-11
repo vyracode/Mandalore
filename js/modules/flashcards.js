@@ -1,5 +1,5 @@
 import { state, bumpSession } from '../state.js';
-import { $, $$ } from './utils.js';
+import { $, $$, getAssetUrl, hasAsset } from './utils.js';
 import getCandidates from '../lib/pinyin-ime.esm.js';
 
 const FRONT_ORDER = ['hanzi', 'pronunciation', 'pinyin', 'meaning'];
@@ -12,6 +12,65 @@ function speak(text) {
     u.lang = 'zh-CN';
     u.rate = 0.8;
     window.speechSynthesis.speak(u);
+}
+
+function playAudioAsset(word) {
+    // Try different audio extensions
+    const audioExts = ['mp3', 'wav', 'ogg', 'm4a', 'aac'];
+    for (const ext of audioExts) {
+        const url = getAssetUrl(word, ext, state.assetCache);
+        if (url) {
+            const audio = new Audio(url);
+            audio.play().catch(e => console.error('Failed to play audio:', e));
+            return true;
+        }
+    }
+    return false;
+}
+
+function getImageAssetUrl(word) {
+    // Try different image extensions
+    const imageExts = ['jpg', 'jpeg', 'png', 'webp', 'gif'];
+    for (const ext of imageExts) {
+        const url = getAssetUrl(word, ext, state.assetCache);
+        if (url) return url;
+    }
+    return null;
+}
+
+function createAudioButton(word, autoplay = false) {
+    const wrap = document.createElement('div');
+    wrap.className = 'front-audio';
+
+    const btn = document.createElement('button');
+    btn.className = 'sound';
+    btn.type = 'button';
+    btn.setAttribute('aria-label', 'Play pronunciation');
+    btn.innerHTML = '<div class="waves" aria-hidden="true"><span></span><span></span><span></span><span></span></div>';
+    
+    const playAudio = () => {
+        btn.animate([{ transform: 'scale(1)' }, { transform: 'scale(1.03)' }, { transform: 'scale(1)' }], { duration: 220, easing: 'ease-out' });
+        // Try asset first, fallback to TTS
+        if (!playAudioAsset(word)) {
+            speak(word);
+        }
+    };
+    
+    btn.addEventListener('click', playAudio);
+    
+    // Autoplay if requested
+    if (autoplay) {
+        setTimeout(() => playAudio(), 100);
+    }
+    
+    wrap.appendChild(btn);
+
+    const d = document.createElement('div');
+    d.style.textAlign = 'left';
+    d.innerHTML = `<div style="font-family:'Google Sans',system-ui,-apple-system,sans-serif; font-weight:950; font-size:16px; letter-spacing:.2px">${state.card.audioLabel}</div><div style="margin-top:4px; color: rgba(255,255,255,.65); font-family:'Google Sans',system-ui,-apple-system,sans-serif; font-weight:800; font-size:12px">Tap to play</div>`;
+    wrap.appendChild(d);
+
+    return wrap;
 }
 
 function generateHanziChoices(targetWord, targetPinyin, count = 5) {
@@ -110,35 +169,39 @@ export function renderFront() {
         d.textContent = state.card.word;
         body.appendChild(d);
     } else if (f === 'meaning') {
+        const container = document.createElement('div');
+        container.style.display = 'flex';
+        container.style.alignItems = 'center';
+        container.style.gap = '16px';
+        
         const d = document.createElement('div');
         d.className = 'front-meaning';
         d.textContent = state.card.meaning;
-        body.appendChild(d);
+        container.appendChild(d);
+        
+        // Add image if available
+        const imageUrl = getImageAssetUrl(state.card.word);
+        if (imageUrl) {
+            const img = document.createElement('img');
+            img.src = imageUrl;
+            img.style.maxWidth = '120px';
+            img.style.maxHeight = '120px';
+            img.style.borderRadius = '12px';
+            img.style.objectFit = 'cover';
+            img.style.border = '1px solid rgba(255, 255, 255, .12)';
+            img.alt = state.card.meaning;
+            container.appendChild(img);
+        }
+        
+        body.appendChild(container);
     } else if (f === 'pinyin') {
         const d = document.createElement('div');
         d.className = 'front-pinyin';
         d.textContent = state.card.pinyinToned;
         body.appendChild(d);
     } else {
-        const wrap = document.createElement('div');
-        wrap.className = 'front-audio';
-
-        const btn = document.createElement('button');
-        btn.className = 'sound';
-        btn.type = 'button';
-        btn.setAttribute('aria-label', 'Play pronunciation');
-        btn.innerHTML = '<div class="waves" aria-hidden="true"><span></span><span></span><span></span><span></span></div>';
-        btn.addEventListener('click', () => {
-            btn.animate([{ transform: 'scale(1)' }, { transform: 'scale(1.03)' }, { transform: 'scale(1)' }], { duration: 220, easing: 'ease-out' });
-            speak(state.card.word);
-        });
-        wrap.appendChild(btn);
-
-        const d = document.createElement('div');
-        d.style.textAlign = 'left';
-        d.innerHTML = `<div style="font-family:'Google Sans',system-ui,-apple-system,sans-serif; font-weight:950; font-size:16px; letter-spacing:.2px">${state.card.audioLabel}</div><div style="margin-top:4px; color: rgba(255,255,255,.65); font-family:'Google Sans',system-ui,-apple-system,sans-serif; font-weight:800; font-size:12px">Tap to play</div>`;
-        wrap.appendChild(d);
-
+        // Pronunciation front - autoplay audio
+        const wrap = createAudioButton(state.card.word, true);
         body.appendChild(wrap);
     }
 
@@ -215,7 +278,10 @@ function wireSoundButtons(scope = document) {
                 [{ transform: 'scale(1)' }, { transform: 'scale(1.03)' }, { transform: 'scale(1)' }],
                 { duration: 220, easing: 'ease-out' }
             );
-            speak(state.card.word);
+            // Try asset first, fallback to TTS
+            if (!playAudioAsset(state.card.word)) {
+                speak(state.card.word);
+            }
         });
     });
 }
@@ -242,18 +308,15 @@ function checkSpeech(modCard) {
     const sg = $('[data-role="speechSelf"]', modCard);
     if (a) {
         a.style.display = 'block';
-        a.innerHTML = `
-      <div class="front-audio">
-        <button class="sound" type="button" aria-label="Play example pronunciation">
-          <div class="waves" aria-hidden="true"><span></span><span></span><span></span><span></span></div>
-        </button>
-        <div style="text-align:left">
-          <div style="font-family:'Google Sans',system-ui,-apple-system,sans-serif; font-weight:950; font-size:16px; letter-spacing:.2px">Example audio</div>
-          <div style="margin-top:4px; color: rgba(255,255,255,.65); font-family:'Google Sans',system-ui,-apple-system,sans-serif; font-weight:800; font-size:12px">Tap to play</div>
-        </div>
-      </div>
-    `;
-        wireSoundButtons(a);
+        a.innerHTML = '';
+        // Use createAudioButton with autoplay for reveal
+        const audioWrap = createAudioButton(state.card.word, true);
+        // Update label
+        const labelDiv = audioWrap.querySelector('div');
+        if (labelDiv) {
+            labelDiv.innerHTML = `<div style="font-family:'Google Sans',system-ui,-apple-system,sans-serif; font-weight:950; font-size:16px; letter-spacing:.2px">Example audio</div><div style="margin-top:4px; color: rgba(255,255,255,.65); font-family:'Google Sans',system-ui,-apple-system,sans-serif; font-weight:800; font-size:12px">Tap to play</div>`;
+        }
+        a.appendChild(audioWrap);
     }
     if (sg) sg.style.display = 'flex';
 }
@@ -352,7 +415,32 @@ function checkMeaning(modCard) {
     const sg = $('[data-role="meaningSelf"]', modCard);
     if (ans) {
         ans.style.display = 'block';
-        ans.innerHTML = `<strong>Answer:</strong> ${state.card.meaning}`;
+        
+        const container = document.createElement('div');
+        container.style.display = 'flex';
+        container.style.alignItems = 'center';
+        container.style.gap = '16px';
+        
+        const textDiv = document.createElement('div');
+        textDiv.innerHTML = `<strong>Answer:</strong> ${state.card.meaning}`;
+        container.appendChild(textDiv);
+        
+        // Add image if available
+        const imageUrl = getImageAssetUrl(state.card.word);
+        if (imageUrl) {
+            const img = document.createElement('img');
+            img.src = imageUrl;
+            img.style.maxWidth = '120px';
+            img.style.maxHeight = '120px';
+            img.style.borderRadius = '12px';
+            img.style.objectFit = 'cover';
+            img.style.border = '1px solid rgba(255, 255, 255, .12)';
+            img.alt = state.card.meaning;
+            container.appendChild(img);
+        }
+        
+        ans.innerHTML = '';
+        ans.appendChild(container);
     }
     if (sg) sg.style.display = 'flex';
 }

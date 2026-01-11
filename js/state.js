@@ -28,7 +28,9 @@ export const state = {
     imported: { deckName: 'My Wordlist' },
     apiKey: '',
     geminiModel: 'gemini-2.5-flash-lite-preview-06-17',
-    cachedSentences: [] // [ { promptEN, promptZH, feedbackOverview, tokens } ]
+    cachedSentences: [], // [ { promptEN, promptZH, feedbackOverview, tokens } ]
+    assetFolder: null, // FileList or null
+    assetCache: {} // { filename: dataUrl } for quick lookup
 };
 
 const STORAGE_KEY = 'mandalore_state_v1';
@@ -40,7 +42,8 @@ export function saveState() {
             deckName: state.imported.deckName,
             apiKey: state.apiKey,
             geminiModel: state.geminiModel,
-            cachedSentences: state.cachedSentences
+            cachedSentences: state.cachedSentences,
+            assetCache: state.assetCache
         };
         localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
     } catch (e) {
@@ -62,6 +65,7 @@ export function loadState() {
         if (data.apiKey) state.apiKey = data.apiKey;
         if (data.geminiModel) state.geminiModel = data.geminiModel;
         if (Array.isArray(data.cachedSentences)) state.cachedSentences = data.cachedSentences;
+        if (data.assetCache && typeof data.assetCache === 'object') state.assetCache = data.assetCache;
         return true;
     } catch (e) {
         console.error('Failed to load state', e);

@@ -73,6 +73,34 @@
                                 </div>
                             </div>
 
+                            <!-- Hanzi Typing (combined Hanzi + Pinyin test) -->
+                            <div class="mod-card" data-mod="hanziTyping" data-state="input" id="modHanziTyping">
+                                <div class="mod-head">
+                                    <div class="chip"><span class="mini"
+                                            style="background: var(--cyan); box-shadow: 0 0 0 3px rgba(40,216,255,.14)"
+                                            aria-hidden="true"></span> Hanzi Typing</div>
+                                    <div class="mod-actions">
+                                        <button class="btn ghost btn-separate" data-action="separateInputs" type="button">Separate</button>
+                                    </div>
+                                </div>
+                                <div class="mod-body">
+                                    <div class="row mod-input">
+                                        <input class="field" inputmode="text" type="text" enterkeyhint="go"
+                                            autocapitalize="none" autocorrect="off" placeholder="type hanzi" 
+                                            data-input="hanziTyping" aria-label="Hanzi input" lang="zh" />
+                                        <button class="btn" data-action="checkHanziTyping" type="button">Check</button>
+                                    </div>
+                                    <div class="checked-row mod-checked">
+                                        <div class="checked-result" data-role="hanziTypingResult">
+                                            <span class="r-dot" aria-hidden="true"></span>
+                                            <span data-role="hanziTypingMsg"></span>
+                                        </div>
+                                        <div class="checked-answer" data-role="hanziTypingAnswer"></div>
+                                        <button class="btn" data-action="coverHanziTyping" data-role="hanziTypingCover" type="button">Cover</button>
+                                    </div>
+                                </div>
+                            </div>
+
                             <!-- Hanzi (multiple choice) -->
                             <div class="mod-card" data-mod="hanzi" data-state="input" id="modHanzi">
                                 <div class="mod-head">

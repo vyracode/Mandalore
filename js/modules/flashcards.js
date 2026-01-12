@@ -7,6 +7,9 @@ const FRONT_ORDER = ['hanzi', 'pronunciation', 'meaning'];
 const FRONT_LABEL = { hanzi: 'Hanzi', pronunciation: 'Audio', pinyin: 'Pinyin', meaning: 'Meaning' };
 const FRONT_HINT = { hanzi: 'Recognize the word', pronunciation: 'Recognize the sound', pinyin: 'Recognize the spelling', meaning: 'Recall the Mandarin' };
 
+// Track if user has separated inputs for current card (resets on next card)
+let inputsSeparated = false;
+
 // FlashCardo audio mappings: wordId -> audioNum
 let flashCardoMappings = null;
 
@@ -157,6 +160,9 @@ function generateHanziChoices(targetWord, targetPinyin, count = 5) {
 }
 
 export function nextCard() {
+    // Reset separated state for new card
+    inputsSeparated = false;
+    
     if (!state.wordlist || state.wordlist.length === 0) {
         // Empty state
         state.card.word = null;
@@ -324,20 +330,36 @@ export function resetAllBack() {
         'meaning': '#modMeaning'
     };
     
+    // Check if both Hanzi and Pinyin should be on the back
+    // This happens when front is 'pronunciation' or 'meaning'
+    const front = state.card.front;
+    const showHanziTyping = (front === 'pronunciation' || front === 'meaning') && !inputsSeparated;
+    
     // Hide the front modality, show all others
-    const allMods = ['#modPron', '#modPinyin', '#modHanzi', '#modMeaning'];
+    const allMods = ['#modPron', '#modPinyin', '#modHanzi', '#modMeaning', '#modHanziTyping'];
     const frontMod = state.card.front ? frontToMod[state.card.front] : null;
     
     allMods.forEach(sel => {
         const modCard = $(sel);
-        if (modCard) {
-            // Hide if it's the front modality, show otherwise
-            if (sel === frontMod) {
-                modCard.style.display = 'none';
-            } else {
-                modCard.style.display = ''; // Remove inline style to use default CSS
+        if (!modCard) return;
+        
+        if (sel === frontMod) {
+            // Hide the front modality
+            modCard.style.display = 'none';
+        } else if (sel === '#modHanziTyping') {
+            // Show Hanzi Typing only when both Hanzi and Pinyin are on back and not separated
+            if (showHanziTyping) {
+                modCard.style.display = '';
                 resetModality(modCard);
+            } else {
+                modCard.style.display = 'none';
             }
+        } else if ((sel === '#modHanzi' || sel === '#modPinyin') && showHanziTyping) {
+            // Hide individual Hanzi and Pinyin when showing Hanzi Typing
+            modCard.style.display = 'none';
+        } else {
+            modCard.style.display = '';
+            resetModality(modCard);
         }
     });
 }
@@ -520,6 +542,56 @@ function selfGrade(modCard, ok, role) {
     }
 }
 
+// Hanzi Typing: combined Hanzi + Pinyin test
+function checkHanziTyping(modCard) {
+    const inputEl = $('[data-input="hanziTyping"]', modCard);
+    const ans = $('[data-role="hanziTypingAnswer"]', modCard);
+    if (!inputEl || !ans) return;
+
+    const input = inputEl.value.trim();
+    const correct = state.card.word || '';
+    const ok = (input === correct);
+    
+    // Switch to checked state
+    modCard.dataset.state = 'checked';
+    
+    showResult(modCard, ok, ok ? 'Right' : 'Wrong', 'hanziTyping');
+    ans.innerHTML = `<strong>Answer:</strong> ${correct} <span style="color: rgba(255,255,255,.5); margin-left: 8px">(${state.card.pinyinToned})</span>`;
+    
+    if (ok) {
+        modCard.classList.add('is-correct');
+        // Hanzi Typing tests both Hanzi recognition and Pinyin spelling, so count as 2
+        bumpSession(2);
+    }
+    // If wrong, Cover button is visible and allows retry
+}
+
+// Cover the answer and allow retry for Hanzi Typing
+function coverHanziTyping(modCard) {
+    const inputEl = $('[data-input="hanziTyping"]', modCard);
+    
+    // Switch back to input state
+    modCard.dataset.state = 'input';
+    
+    // Clear input for retry
+    if (inputEl) {
+        inputEl.value = '';
+        inputEl.focus();
+    }
+    
+    // Clear result indicator
+    const result = $('[data-role="hanziTypingResult"]', modCard);
+    if (result) {
+        result.classList.remove('good', 'bad');
+    }
+}
+
+// Separate into individual Hanzi choice and Pinyin spelling inputs
+function separateInputs() {
+    inputsSeparated = true;
+    resetAllBack();
+}
+
 export function bindModality(modCard) {
     if (!modCard) return;
     modCard.addEventListener('click', (e) => {
@@ -533,6 +605,9 @@ export function bindModality(modCard) {
         if (t.matches('[data-action="checkPinyin"]')) return checkPinyin(modCard);
         if (t.matches('[data-action="coverPinyin"]')) return coverPinyin(modCard);
         if (t.matches('[data-action="checkMeaning"]')) return checkMeaning(modCard);
+        if (t.matches('[data-action="checkHanziTyping"]')) return checkHanziTyping(modCard);
+        if (t.matches('[data-action="coverHanziTyping"]')) return coverHanziTyping(modCard);
+        if (t.matches('[data-action="separateInputs"]')) return separateInputs();
 
         if (t.matches('[data-action="selfRight"]')) {
             const role = t.closest('[data-role="speechSelf"]') ? 'speech' : 'meaning';
@@ -558,6 +633,9 @@ export function bindModality(modCard) {
             } else if (input.matches('[data-input="pinyin"]')) {
                 e.preventDefault();
                 checkPinyin(modCard);
+            } else if (input.matches('[data-input="hanziTyping"]')) {
+                e.preventDefault();
+                checkHanziTyping(modCard);
             }
         }
     });

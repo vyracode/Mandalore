@@ -11,7 +11,7 @@ function runSmokeTests() {
         '#tabFlash', '#tabTranslate', '#tabSettings',
         '#screen-flash', '#screen-translate', '#screen-settings',
         '#btnFabNext',
-        '#modPron', '#modPinyin', '#modHanzi', '#modMeaning',
+        '#modPron', '#modPinyin', '#modHanzi', '#modMeaning', '#modHanziTyping',
         '#fbSentence', '#btnSubmitTranslation', '#btnNewSentence', '#btnBackToInput',
         '#btnImport', '#btnForgetKey', '#btnForgetList', '#btnClearCache'
     ];
@@ -55,6 +55,7 @@ bindModality($('#modPron'));
 bindModality($('#modPinyin'));
 bindModality($('#modHanzi'));
 bindModality($('#modMeaning'));
+bindModality($('#modHanziTyping'));
 
 // Translation controls
 on('#dirENZH', 'click', () => setTranslationDir('ENZH'));

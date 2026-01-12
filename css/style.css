@@ -202,6 +202,21 @@ nav {
     font-weight: 600
 }
 
+.btn-separate {
+    font-size: 12px !important;
+    padding: 4px 10px !important;
+    opacity: 0.7;
+}
+
+.btn-separate:hover {
+    opacity: 1;
+}
+
+/* Hide separate button when checked */
+.mod-card[data-state="checked"] .btn-separate {
+    display: none;
+}
+
 .mono {
     font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
     font-weight: 400;
@@ -699,12 +714,14 @@ nav {
 }
 
 /* Cover button styling */
-[data-role="pinyinCover"] {
+[data-role="pinyinCover"],
+[data-role="hanziTypingCover"] {
     flex-shrink: 0;
 }
 
 /* Hide cover button when correct */
-.mod-card[data-state="checked"].is-correct [data-role="pinyinCover"] {
+.mod-card[data-state="checked"].is-correct [data-role="pinyinCover"],
+.mod-card[data-state="checked"].is-correct [data-role="hanziTypingCover"] {
     display: none;
 }
 

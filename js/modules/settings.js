@@ -372,3 +372,29 @@ export async function handleFileSelect(event) {
     // Reset file input
     event.target.value = '';
 }
+
+export function clearCacheAndReload() {
+    if (!confirm('Clear cache and reload? This will refresh the page with the latest files, but will keep your API key and wordlist.')) return;
+    
+    // Clear service worker cache if it exists
+    if ('serviceWorker' in navigator && 'caches' in window) {
+        caches.keys().then(names => {
+            return Promise.all(names.map(name => caches.delete(name)));
+        }).catch(err => {
+            console.warn('Failed to clear caches:', err);
+        });
+    }
+    
+    // Force a hard reload (bypass cache) - equivalent to Ctrl+F5
+    // Try the deprecated but widely-supported reload(true) first
+    // Fallback to location.replace with cache-busting parameter
+    if (typeof location.reload === 'function') {
+        // Most browsers still support reload(true) for hard reload
+        location.reload(true);
+    } else {
+        // Fallback: use location.replace with cache-busting
+        const url = new URL(location.href);
+        url.searchParams.set('_nocache', Date.now().toString());
+        location.replace(url.toString());
+    }
+}

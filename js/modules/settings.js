@@ -4,6 +4,43 @@ import { nextCard } from './flashcards.js';
 import { prompts } from './prompts.js';
 import { generateWordId } from './wordId.js';
 
+function autoResizeTextarea(textarea) {
+    if (!textarea) return;
+    
+    // Reset height to auto to get the correct scrollHeight
+    textarea.style.height = 'auto';
+    
+    // Get computed styles
+    const computedStyle = window.getComputedStyle(textarea);
+    const minHeight = parseFloat(computedStyle.minHeight) || 44;
+    const maxHeight = parseFloat(computedStyle.maxHeight) || 264;
+    
+    // Calculate the content height
+    const contentHeight = textarea.scrollHeight;
+    
+    // Set the height, respecting min and max
+    const newHeight = Math.max(minHeight, Math.min(maxHeight, contentHeight));
+    textarea.style.height = `${newHeight}px`;
+    
+    // Enable/disable scrolling based on whether we hit max height
+    if (contentHeight > maxHeight) {
+        textarea.style.overflowY = 'auto';
+    } else {
+        textarea.style.overflowY = 'hidden';
+    }
+}
+
+export function setupTextareaAutoResize() {
+    const textarea = $('#wordlistJson');
+    if (!textarea) return;
+    
+    // Set initial height
+    autoResizeTextarea(textarea);
+    
+    // Auto-resize on input
+    textarea.addEventListener('input', () => autoResizeTextarea(textarea));
+}
+
 export function renderKeyStatus() {
     const s = $('#keyStatus');
     if (s) {
@@ -211,7 +248,10 @@ export function handleForgetList() {
     state.cachedSentences = [];
     saveState();
     const wl = $('#wordlistJson');
-    if (wl) wl.value = '[]';
+    if (wl) {
+        wl.value = '[]';
+        autoResizeTextarea(wl);
+    }
 
     showImportMessage('ok', 'Wordlist forgotten.');
 
@@ -396,5 +436,64 @@ export function clearCacheAndReload() {
         const url = new URL(location.href);
         url.searchParams.set('_nocache', Date.now().toString());
         location.replace(url.toString());
+    }
+}
+
+export async function loadVersionInfo() {
+    const versionEl = $('#versionInfo');
+    if (!versionEl) return;
+
+    try {
+        // Fetch commits from GitHub API
+        const repo = 'vyracode/Mandalore';
+        
+        // Get latest commit and commit count
+        const commitsUrl = `https://api.github.com/repos/${repo}/commits?per_page=1`;
+        const response = await fetch(commitsUrl);
+        if (!response.ok) throw new Error('Failed to fetch commits');
+        
+        const commits = await response.json();
+        if (!commits || commits.length === 0) throw new Error('No commits found');
+        
+        const latestCommit = commits[0];
+        const commitDate = new Date(latestCommit.commit.author.date);
+        
+        // Get commit count by checking Link header for pagination
+        // Parse Link header to find total pages, or fetch multiple pages
+        let commitCount = 0;
+        let page = 1;
+        let hasMore = true;
+        
+        // Fetch commits in batches to count them
+        while (hasMore && page <= 10) { // Limit to 10 pages (1000 commits max) to avoid rate limits
+            const pageResponse = await fetch(`https://api.github.com/repos/${repo}/commits?per_page=100&page=${page}`);
+            if (!pageResponse.ok) break;
+            
+            const pageCommits = await pageResponse.json();
+            commitCount += pageCommits.length;
+            
+            // Check if there are more pages
+            const linkHeader = pageResponse.headers.get('Link');
+            hasMore = linkHeader && linkHeader.includes('rel="next"');
+            page++;
+            
+            // If we got less than 100 commits, we're done
+            if (pageCommits.length < 100) break;
+        }
+        
+        // Format date in attractive human-readable local time
+        const formatter = new Intl.DateTimeFormat('en-US', {
+            month: 'short',
+            day: 'numeric',
+            year: 'numeric'
+        });
+        
+        const formattedDate = formatter.format(commitDate);
+        
+        // Display version info
+        versionEl.innerHTML = `v0.${commitCount || '?'}&nbsp;&nbsp;|&nbsp;&nbsp;${formattedDate}`;
+    } catch (error) {
+        console.warn('Failed to load version info:', error);
+        versionEl.innerHTML = 'v0.?&nbsp;&nbsp;|&nbsp;&nbsp;Unknown';
     }
 }

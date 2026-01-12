@@ -291,10 +291,7 @@
                             </div>
 
                             <textarea id="wordlistJson" class="textarea-small mono" inputmode="text" enterkeyhint="done"
-                                autocapitalize="none" autocorrect="off" spellcheck="false" aria-label="Wordlist JSON">[
-  {"word":"欢迎","pinyin":"huānyíng","definition":"welcome"},
-  {"word":"面包","pinyin":"miànbāo","definition":"bread"}
-]</textarea>
+                                autocapitalize="none" autocorrect="off" spellcheck="false" aria-label="Wordlist JSON"></textarea>
 
                             <div class="error" id="importError"></div>
                             <div class="ok" id="importOk"></div>
@@ -318,10 +315,12 @@
                             <button class="btn ghost" id="btnClearCache" style="width: 100%; margin-top: 12px;" type="button">Clear Cache & Reload</button>
                         </div>
 
-                    </div>
-
-                    <div class="settings-brand" aria-label="Mandalore">
-                        <div class="wordmark">Mandalore</div>
+                        <div class="settings-brand" aria-label="Mandalore">
+                            <div class="brand-content">
+                                <div class="wordmark">Mandalore</div>
+                                <div class="version-info" id="versionInfo"></div>
+                            </div>
+                        </div>
                     </div>
                 </div>
         </main>

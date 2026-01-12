@@ -2,7 +2,7 @@ import { state, loadState, saveState } from './state.js';
 import { $, on } from './modules/utils.js';
 import { renderFront, nextCard, resetAllBack, bindModality } from './modules/flashcards.js';
 import { setTranslationDir, checkTranslation, newSentence, showTranslateA, handleFeedbackClick, renderFeedbackTokens } from './modules/translation.js';
-import { renderKeyStatus, handleImport, handleForgetList, forgetKey, saveKey, copyPrompt, renderModel, handleModelChange, triggerBrowse, handleFileSelect, initPWAInstall } from './modules/settings.js';
+import { renderKeyStatus, handleImport, handleForgetList, forgetKey, saveKey, copyPrompt, renderModel, handleModelChange, triggerBrowse, handleFileSelect } from './modules/settings.js';
 
 
 function runSmokeTests() {
@@ -83,32 +83,6 @@ on('#btnForgetList', 'click', handleForgetList);
 
 // Reset UI removed as per request. Use individual Forget buttons.
 
-
-// Register Service Worker for PWA
-if ('serviceWorker' in navigator) {
-    window.addEventListener('load', () => {
-        navigator.serviceWorker.register('/sw.js')
-            .then((registration) => {
-                console.log('[Service Worker] Registered successfully:', registration.scope);
-                
-                // Check for updates
-                registration.addEventListener('updatefound', () => {
-                    const newWorker = registration.installing;
-                    newWorker.addEventListener('statechange', () => {
-                        if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-                            // New service worker available, prompt user to reload
-                            console.log('[Service Worker] New version available');
-                            // Optionally show a notification to the user
-                        }
-                    });
-                });
-            })
-            .catch((error) => {
-                console.warn('[Service Worker] Registration failed:', error);
-            });
-    });
-}
-
 // Init
 if (loadState()) {
     console.log('State loaded. Wordlist size:', state.wordlist.length);
@@ -122,5 +96,4 @@ setTranslationDir('ENZH');
 renderKeyStatus();
 renderModel();
 renderFeedbackTokens();
-initPWAInstall();
 runSmokeTests();

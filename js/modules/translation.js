@@ -196,11 +196,12 @@ export async function checkTranslation() {
     btn.disabled = true;
 
     try {
-        const targetLang = (state.translationDir === 'ENZH') ? 'Mandarin' : 'English';
-        const srcText = (state.translationDir === 'ENZH') ? state.translation.promptEN : state.translation.promptZH;
-        const correctText = (state.translationDir === 'ENZH') ? state.translation.promptZH : state.translation.promptEN;
+        const isEnglishToChinese = state.translationDir === 'ENZH';
+        const srcText = isEnglishToChinese ? state.translation.promptEN : state.translation.promptZH;
 
-        const prompt = prompts.evaluateTranslation(srcText, correctText, userText, targetLang);
+        const prompt = isEnglishToChinese
+            ? prompts.evaluateEnglishToChinese(srcText, state.translation.promptZH, userText)
+            : prompts.evaluateChineseToEnglish(srcText, userText);
 
         const data = await callGemini(prompt);
 

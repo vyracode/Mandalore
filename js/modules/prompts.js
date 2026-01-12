@@ -4,7 +4,9 @@ export const prompts = {
 Return a JSON object with: { "mandarin": "The sentence in Hanzi", "english": "The English translation" }.`;
     },
 
+    // ///////////////////////////////////////////////////////////////////////////
     // English → Chinese grading (word-by-word comparison with correct answer)
+    // ///////////////////////////////////////////////////////////////////////////
     evaluateEnglishToChinese: (srcText, correctText, userText) => {
         return `Grade a translation by comparing the user's attempt to the correct answer WORD-BY-WORD.
 
@@ -16,6 +18,7 @@ CHINESE RULES:
 - Tokenize by WORDS, not individual characters (e.g. "我是美国人" → [我, 是, 美国人])
 - Accept Hanzi OR Pinyin (wo=我, xihuan=喜欢, meiguoren=美国人)
 - If user got a word partially right (some chars correct, some wrong), use "spelling" and explain in detail
+- IMPORTANT: When referencing Chinese words in feedback (overview and detail fields), always format as: Hanzi (pinyin with tone marks). Example: "我 (wǒ)", "喜欢 (xǐhuān)", "美国人 (měiguórén)"
 
 GRADING SYSTEM:
 - "ok" = Word matches correct (or acceptable Pinyin equivalent)
@@ -42,31 +45,33 @@ Source: "He is American"
 Correct: "他是美国人" → Words: [他, 是, 美国人]
 User: "他是美高"
 
-{"words":[{"text":"他","cls":"ok","detail":"Correct! 他 = he"},{"text":"是","cls":"ok","detail":"Correct! 是 = is"},{"text":"美高","cls":"spelling","detail":"Close! You got 美 right, but 高 should be 国, and you're missing 人. The word is 美国人 (American)."}],"overview":"Good attempt! 👍 2 out of 3 words correct."}
+{"words":[{"text":"他","cls":"ok","detail":"Correct! 他 (tā) = he"},{"text":"是","cls":"ok","detail":"Correct! 是 (shì) = is"},{"text":"美高","cls":"spelling","detail":"Close! You got 美 (měi) right, but 高 (gāo) should be 国 (guó), and you're missing 人 (rén). The word is 美国人 (měiguórén)."}],"overview":"Good attempt! 👍 2 out of 3 words correct - 他 (tā) and 是 (shì) are perfect!"}
 
 EXAMPLE 2 (Perfect - Pinyin accepted):
 Source: "I like cats"
 Correct: "我喜欢猫" → Words: [我, 喜欢, 猫]
 User: "wo xihuan mao"
 
-{"words":[{"text":"wo","cls":"ok","detail":"Correct! wo = 我 (I)"},{"text":"xihuan","cls":"ok","detail":"Correct! xihuan = 喜欢 (like)"},{"text":"mao","cls":"ok","detail":"Correct! mao = 猫 (cat)"}],"overview":"Perfect! 🎉 All 3 words correct."}
+{"words":[{"text":"wo","cls":"ok","detail":"Correct! wo = 我 (wǒ)"},{"text":"xihuan","cls":"ok","detail":"Correct! xihuan = 喜欢 (xǐhuān)"},{"text":"mao","cls":"ok","detail":"Correct! mao = 猫 (māo)"}],"overview":"Perfect! 🎉 All 3 words correct - 我 (wǒ), 喜欢 (xǐhuān), and 猫 (māo)."}
 
 EXAMPLE 3 (Missing word + extra word):
 Source: "I eat apples"
 Correct: "我吃苹果" → Words: [我, 吃, 苹果]
 User: "wo 苹果 hello"
 
-{"words":[{"text":"wo","cls":"ok","detail":"Correct! wo = 我 (I)"},{"text":"吃","cls":"missing","detail":"Missing 吃 (eat). Don't skip verbs!"},{"text":"苹果","cls":"ok","detail":"Correct! 苹果 = apple"},{"text":"hello","cls":"extra","detail":"Extra word - not needed"}],"overview":"2 out of 3 words, but missed the verb. 😊"}
+{"words":[{"text":"wo","cls":"ok","detail":"Correct! wo = 我 (wǒ)"},{"text":"吃","cls":"missing","detail":"Missing 吃 (chī) - don't skip verbs!"},{"text":"苹果","cls":"ok","detail":"Correct! 苹果 (píngguǒ) = apple"},{"text":"hello","cls":"extra","detail":"Extra word - not needed"}],"overview":"2 out of 3 words correct - got 我 (wǒ) and 苹果 (píngguǒ), but missed 吃 (chī). 😊"}
 
 EXAMPLE 4 (Wrong word choice vs spelling):
 Source: "I like dogs"
 Correct: "我喜欢狗" → Words: [我, 喜欢, 狗]
 User: "wo xihun 猫"
 
-{"words":[{"text":"wo","cls":"ok","detail":"Correct! wo = 我 (I)"},{"text":"xihun","cls":"spelling","detail":"Typo! Should be 'xihuan' not 'xihun'"},{"text":"猫","cls":"wrong","detail":"Wrong word! 猫 means 'cat', but sentence says 'dogs' (狗)"}],"overview":"Good structure! 🐕 One typo and one wrong word."}`;
+{"words":[{"text":"wo","cls":"ok","detail":"Correct! wo = 我 (wǒ)"},{"text":"xihun","cls":"spelling","detail":"Typo! Should be 'xihuan' (喜欢 xǐhuān), not 'xihun'"},{"text":"猫","cls":"wrong","detail":"Wrong word! 猫 (māo) means 'cat', but sentence says 'dogs' - should be 狗 (gǒu)"}],"overview":"Good structure! 🐕 Got 我 (wǒ) right, but typo in 喜欢 (xǐhuān) and used 猫 (māo) instead of 狗 (gǒu)."}`;
     },
 
+    // ///////////////////////////////////////////////////////////////////////////
     // Chinese → English grading (meaning-based, no fixed correct answer)
+    // ///////////////////////////////////////////////////////////////////////////
     evaluateChineseToEnglish: (srcText, userText) => {
         return `Grade an English translation of a Chinese sentence. The user is a NATIVE ENGLISH SPEAKER learning Mandarin - we are testing their CHINESE COMPREHENSION, not their English skills.
 
@@ -123,6 +128,10 @@ User: "She studys Chineese every day"
 
 {"words":[{"text":"She","cls":"ok","detail":"Correct! 她 = she"},{"text":"studys","cls":"ok","detail":"Correct! 学习 = study (btw: 'studies' in English)"},{"text":"Chineese","cls":"ok","detail":"Correct! 中文 = Chinese (btw: spelled 'Chinese')"},{"text":"every day","cls":"ok","detail":"Correct! 每天 = every day"}],"overview":"Perfect comprehension! 🎉 You understood everything."}`;
     },
+
+    // ///////////////////////////////////////////////////////////////////////////
+    // Wordlist extraction and verification
+    // ///////////////////////////////////////////////////////////////////////////
 
     wordlistExtraction: () => {
         return `Extract the wordlist and output it as a JSON array of objects with keys: "word" (Hanzi), "pinyin" (with tone marks), and "definition" (English). 

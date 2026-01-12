@@ -28,7 +28,7 @@ export const state = {
     },
     imported: { deckName: 'My Wordlist' },
     apiKey: '',
-    geminiModel: 'gemini-2.5-flash-lite',
+    geminiModel: 'gemini-2.0-flash',
     cachedSentences: [] // [ { promptEN, promptZH, feedbackOverview, tokens } ]
 };
 

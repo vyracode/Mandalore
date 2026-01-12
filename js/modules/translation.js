@@ -31,8 +31,20 @@ async function callGemini(prompt) {
     const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
     if (!text) throw new Error("No response text from Gemini.");
 
-    // Clean markdown code blocks if any
-    const clean = text.replace(/```json/g, '').replace(/```/g, '').trim();
+    // Clean markdown code blocks and any preamble text
+    let clean = text.trim();
+    
+    // Remove markdown code blocks
+    clean = clean.replace(/```json\s*/g, '').replace(/```\s*/g, '');
+    
+    // Try to extract JSON if there's text before it
+    // Look for the first { and last }
+    const firstBrace = clean.indexOf('{');
+    const lastBrace = clean.lastIndexOf('}');
+    
+    if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+        clean = clean.substring(firstBrace, lastBrace + 1);
+    }
 
     try {
         return JSON.parse(clean);
@@ -186,8 +198,9 @@ export async function checkTranslation() {
     try {
         const targetLang = (state.translationDir === 'ENZH') ? 'Mandarin' : 'English';
         const srcText = (state.translationDir === 'ENZH') ? state.translation.promptEN : state.translation.promptZH;
+        const correctText = (state.translationDir === 'ENZH') ? state.translation.promptZH : state.translation.promptEN;
 
-        const prompt = prompts.evaluateTranslation(srcText, targetLang, userText);
+        const prompt = prompts.evaluateTranslation(srcText, correctText, userText, targetLang);
 
         const data = await callGemini(prompt);
 

@@ -876,7 +876,7 @@ nav {
 .prompt .txt {
     font-size: 18px;
     font-family: "Google Sans", system-ui, -apple-system, sans-serif;
-    font-weight: 900;
+    font-weight: 400;
     line-height: 1.2;
     letter-spacing: .15px;
 }
@@ -888,7 +888,103 @@ nav {
     min-height: 0;
 }
 
-textarea {
+.translate-feedback {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+#feedbackContent {
+    display: flex;
+    flex-direction: column;
+}
+
+#feedbackContent > * + * {
+    margin-top: 12px;
+}
+
+/* Hide detail tag */
+.detail .tag {
+    display: none;
+}
+
+.translate-loader {
+    padding: 20px;
+    text-align: center;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.loader-dots {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+    justify-content: center;
+}
+
+.loader-dots span {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, .6);
+    display: inline-block;
+    animation: loaderDot 1.4s ease-in-out infinite both;
+}
+
+.loader-dots span:nth-child(1) {
+    animation-delay: -0.32s;
+}
+
+.loader-dots span:nth-child(2) {
+    animation-delay: -0.16s;
+}
+
+.loader-dots span:nth-child(3) {
+    animation-delay: 0s;
+}
+
+@keyframes loaderDot {
+    0%, 80%, 100% {
+        transform: scale(0.8);
+        opacity: 0.5;
+    }
+    40% {
+        transform: scale(1.2);
+        opacity: 1;
+    }
+}
+
+.fb-overview {
+    font-size: 14px;
+    font-weight: 400;
+    color: rgba(255, 255, 255, .86);
+    line-height: 1.5;
+}
+
+.fb-overview strong {
+    font-weight: 700;
+    color: var(--green);
+}
+
+.fb-overview em {
+    font-style: italic;
+    color: var(--pink);
+}
+
+/* Standardize font sizes in feedback */
+#feedbackContent .prompt .txt {
+    font-size: 14px;
+}
+
+.feedback-actions {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: 0;
+}
+
+textarea,
+input[type="text"] {
     flex: 1;
     min-height: 0;
     width: 100%;
@@ -899,10 +995,16 @@ textarea {
     color: var(--text);
     padding: 12px;
     font-size: 15px;
-    font-weight: 650;
+    font-weight: 400;
     line-height: 1.25;
     outline: none;
     box-shadow: inset 0 1px 0 rgba(255, 255, 255, .06);
+}
+
+input[type="text"]:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    background: rgba(255, 255, 255, .02);
 }
 
 .translate-actions {
@@ -945,7 +1047,8 @@ textarea {
     border: 1px solid rgba(255, 255, 255, .10);
     color: rgba(255, 255, 255, .92);
     font-family: "Google Sans", system-ui, -apple-system, sans-serif;
-    font-weight: 950;
+    font-size: 14px;
+    font-weight: 400;
     cursor: pointer;
     user-select: none;
     display: inline-flex;
@@ -991,13 +1094,7 @@ textarea {
 }
 
 .detail .tag {
-    font-size: 12px;
-    font-family: "Google Sans", system-ui, -apple-system, sans-serif;
-    font-weight: 950;
-    color: rgba(255, 255, 255, .70);
-    display: flex;
-    align-items: center;
-    gap: 8px;
+    display: none;
 }
 
 .detail .tag .k {
@@ -1009,9 +1106,22 @@ textarea {
 }
 
 .detail .dbody {
-    font-weight: 850;
+    font-weight: 400;
+    font-size: 14px;
     color: rgba(255, 255, 255, .86);
-    line-height: 1.25;
+    line-height: 1.5;
+}
+
+.detail .dbody strong {
+    font-weight: 700;
+    font-style: normal;
+    color: var(--green);
+}
+
+.detail .dbody em {
+    font-weight: 400;
+    font-style: italic;
+    color: var(--pink);
 }
 
 /* Settings */

@@ -1,7 +1,7 @@
 import { state, loadState, saveState } from './state.js';
 import { $, on } from './modules/utils.js';
 import { renderFront, nextCard, resetAllBack, bindModality } from './modules/flashcards.js';
-import { setTranslationDir, checkTranslation, newSentence, showTranslateA, handleFeedbackClick, renderFeedbackTokens } from './modules/translation.js';
+import { setTranslationDir, checkTranslation, newSentence, showTranslateA, handleFeedbackClick, renderFeedbackTokens, skipSentence, switchTranslationDir } from './modules/translation.js';
 import { renderKeyStatus, handleImport, handleForgetList, forgetKey, saveKey, copyPrompt, renderModel, handleModelChange, triggerBrowse, handleFileSelect, clearCacheAndReload, loadVersionInfo, setupTextareaAutoResize, renderSentenceCount, viewSentences, closeModal, forgetSentences } from './modules/settings.js';
 
 
@@ -12,7 +12,7 @@ function runSmokeTests() {
         '#screen-flash', '#screen-translate', '#screen-settings',
         '#btnFabNext',
         '#modPron', '#modPinyin', '#modHanzi', '#modMeaning', '#modHanziTyping',
-        '#fbSentence', '#btnSubmitTranslation', '#btnNewSentence', '#btnBackToInput',
+        '#fbSentence', '#btnSubmitTranslation', '#btnSwitchDirection', '#btnSkipSentence', '#btnNextSentence',
         '#btnImport', '#btnForgetKey', '#btnForgetList', '#btnClearCache'
     ];
     const missing = required.filter(s => !$(s));
@@ -58,11 +58,21 @@ bindModality($('#modMeaning'));
 bindModality($('#modHanziTyping'));
 
 // Translation controls
-on('#dirENZH', 'click', () => setTranslationDir('ENZH'));
-on('#dirZHEN', 'click', () => setTranslationDir('ZHEN'));
-// on('#btnSubmitTranslation', 'click', ... ) -> Moved below
-on('#btnNewSentence', 'click', () => newSentence());
-on('#btnBackToInput', 'click', () => showTranslateA());
+on('#btnSwitchDirection', 'click', () => switchTranslationDir());
+on('#btnSubmitTranslation', 'click', () => checkTranslation());
+on('#btnSkipSentence', 'click', () => skipSentence());
+on('#btnNextSentence', 'click', () => newSentence());
+
+// Enter key handling for translation input
+const userTranslationInput = $('#userTranslation');
+if (userTranslationInput) {
+    userTranslationInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' && !e.shiftKey && !userTranslationInput.disabled) {
+            e.preventDefault();
+            checkTranslation();
+        }
+    });
+}
 
 const fb = $('#fbSentence');
 if (fb) {
@@ -74,7 +84,6 @@ on('#apiKey', 'input', renderKeyStatus);
 on('#btnSaveKey', 'click', saveKey);
 on('#geminiModel', 'change', handleModelChange);
 on('#btnForgetKey', 'click', forgetKey);
-on('#btnSubmitTranslation', 'click', () => checkTranslation());
 on('#btnCopyPrompt', 'click', copyPrompt);
 
 on('#btnImport', 'click', handleImport);

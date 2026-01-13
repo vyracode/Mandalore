@@ -1,5 +1,5 @@
 import { state, saveState } from '../state.js';
-import { $, $$ } from './utils.js';
+import { $, $$, renderMarkdown } from './utils.js';
 import { prompts } from './prompts.js';
 import { renderSentenceCount } from './settings.js';
 
@@ -60,19 +60,32 @@ async function callGemini(prompt) {
 export function setTranslationDir(dir) {
     state.translationDir = dir;
     const onENZH = (dir === 'ENZH');
-    const b1 = $('#dirENZH');
-    const b2 = $('#dirZHEN');
-    if (b1) { b1.dataset.on = String(onENZH); b1.setAttribute('aria-selected', onENZH ? 'true' : 'false'); }
-    if (b2) { b2.dataset.on = String(!onENZH); b2.setAttribute('aria-selected', onENZH ? 'false' : 'true'); }
+    
+    // Update switch button to show opposite direction
+    const switchBtn = $('#btnSwitchDirection');
+    if (switchBtn) {
+        switchBtn.textContent = onENZH ? '中文 → EN' : 'EN → 中文';
+    }
 
     const label = $('#translateLabel');
     const prompt = $('#promptText');
+    const textarea = $('#userTranslation');
     if (label) label.textContent = onENZH ? 'Translate into 中文' : 'Translate into English';
 
     // Refresh prompt text based on current sentence
     if (prompt) prompt.textContent = onENZH ? state.translation.promptEN : state.translation.promptZH;
 
+    // Update placeholder based on translation direction
+    if (textarea) {
+        textarea.placeholder = onENZH ? 'Type Hanzi and/or Pinyin' : 'Type English';
+    }
+
     showTranslateA();
+}
+
+export function switchTranslationDir() {
+    const newDir = state.translationDir === 'ENZH' ? 'ZHEN' : 'ENZH';
+    setTranslationDir(newDir);
 }
 
 export function renderFeedbackTokens() {
@@ -116,41 +129,83 @@ function setDetail(idx) {
 
     detail.style.display = 'flex';
     tag.textContent = tok.text;
-    body.innerHTML = tok.detail;
+    body.innerHTML = renderMarkdown(tok.detail);
 }
 
 export function showTranslateA() {
-    const a = $('#translateA');
-    const b = $('#translateB');
-    if (a) a.style.display = 'flex';
-    if (b) b.style.display = 'none';
     const input = $('#userTranslation');
-    if (input) input.focus({ preventScroll: true });
+    const feedback = $('#translateFeedback');
+    const btn = $('#btnSubmitTranslation');
+    const promptBox = $('#translatePromptBox');
+    const inputArea = $('#translateInputArea');
+    const skipBtn = $('#btnSkipSentence');
+    const switchBtn = $('#btnSwitchDirection');
+    if (input) {
+        input.disabled = false;
+        input.value = '';
+        input.focus({ preventScroll: true });
+    }
+    if (feedback) feedback.style.display = 'none';
+    if (promptBox) promptBox.style.display = '';
+    if (inputArea) inputArea.style.display = '';
+    if (btn) btn.style.display = 'block';
+    if (skipBtn) skipBtn.style.display = 'block';
+    if (switchBtn) switchBtn.style.display = 'block';
 }
 
-export function showTranslateB() {
-    const a = $('#translateA');
-    const b = $('#translateB');
-    if (a) a.style.display = 'none';
-    if (b) b.style.display = 'flex';
-
+function showFeedback() {
+    const feedback = $('#translateFeedback');
+    const loader = $('#translateLoader');
+    const content = $('#feedbackContent');
+    const inputArea = $('#translateInputArea');
     const ov = $('#fbOverview');
-    if (ov) ov.textContent = state.translation.feedbackOverview;
+    const btn = $('#btnSubmitTranslation');
+    const nextBtn = $('#btnNextSentence');
+    if (ov) ov.innerHTML = renderMarkdown(state.translation.feedbackOverview);
     renderFeedbackTokens();
+    if (feedback) feedback.style.display = 'block';
+    if (loader) loader.style.display = 'none';
+    if (content) content.style.display = 'block';
+    if (inputArea) inputArea.style.display = 'none';
+    if (btn) btn.style.display = 'none';
+    if (nextBtn) nextBtn.style.display = 'block';
+}
+
+function showLoader() {
+    const feedback = $('#translateFeedback');
+    const loader = $('#translateLoader');
+    const content = $('#feedbackContent');
+    const promptBox = $('#translatePromptBox');
+    const inputArea = $('#translateInputArea');
+    const skipBtn = $('#btnSkipSentence');
+    const nextBtn = $('#btnNextSentence');
+    const switchBtn = $('#btnSwitchDirection');
+    if (feedback) feedback.style.display = 'block';
+    if (loader) loader.style.display = 'block';
+    if (content) content.style.display = 'none';
+    if (promptBox) promptBox.style.display = 'none';
+    if (inputArea) inputArea.style.display = 'none';
+    if (skipBtn) skipBtn.style.display = 'none';
+    if (nextBtn) nextBtn.style.display = 'none';
+    if (switchBtn) switchBtn.style.display = 'none';
 }
 
 // --- LOGIC ---
 
 export async function newSentence() {
-    const btn = $('#btnNewSentence');
     const promptDiv = $('#promptText');
+    const nextBtn = $('#btnNextSentence');
+    const skipBtn = $('#btnSkipSentence');
 
     if (state.wordlist.length < 5) {
         if (promptDiv) promptDiv.textContent = "Please add at least 5 words to your wordlist in Settings first.";
         return;
     }
 
-    if (btn) { btn.textContent = 'Generating...'; btn.disabled = true; }
+    // Hide buttons and show loader
+    if (nextBtn) nextBtn.style.display = 'none';
+    if (skipBtn) skipBtn.style.display = 'none';
+    showLoader();
     if (promptDiv) promptDiv.style.opacity = '0.5';
 
     try {
@@ -182,15 +237,20 @@ export async function newSentence() {
         saveState();
         renderSentenceCount();
 
-        // Update UI
+        // Update UI and reset
         setTranslationDir(state.translationDir); // Refreshes text
-        const input = $('#userTranslation');
-        if (input) input.value = '';
+        showTranslateA(); // Resets input and hides feedback
 
     } catch (e) {
         alert(e.message);
+        // Re-show buttons on error
+        const switchBtn = $('#btnSwitchDirection');
+        if (nextBtn) nextBtn.style.display = 'block';
+        if (skipBtn) skipBtn.style.display = 'block';
+        if (switchBtn) switchBtn.style.display = 'block';
+        const feedback = $('#translateFeedback');
+        if (feedback) feedback.style.display = 'none';
     } finally {
-        if (btn) { btn.textContent = 'New sentence'; btn.disabled = false; }
         if (promptDiv) promptDiv.style.opacity = '1';
     }
 }
@@ -203,8 +263,10 @@ export async function checkTranslation() {
     const userText = input.value.trim();
     if (!userText) return;
 
-    btn.textContent = 'Checking...';
-    btn.disabled = true;
+    // Disable input, hide button, show loader, hide skip button
+    input.disabled = true;
+    btn.style.display = 'none';
+    showLoader();
 
     try {
         const isEnglishToChinese = state.translationDir === 'ENZH';
@@ -219,13 +281,19 @@ export async function checkTranslation() {
         state.translation.feedbackOverview = data.overview;
         state.translation.tokens = data.words;
 
-        showTranslateB();
+        showFeedback();
 
     } catch (e) {
         alert(e.message);
-    } finally {
-        btn.textContent = 'Check';
-        btn.disabled = false;
+        // Re-enable on error
+        input.disabled = false;
+        btn.style.display = 'block';
+        const feedback = $('#translateFeedback');
+        if (feedback) feedback.style.display = 'none';
+        const skipBtn = $('#btnSkipSentence');
+        const switchBtn = $('#btnSwitchDirection');
+        if (skipBtn) skipBtn.style.display = 'block';
+        if (switchBtn) switchBtn.style.display = 'block';
     }
 }
 
@@ -235,4 +303,9 @@ export function handleFeedbackClick(e) {
     if (!btn) return;
     const idx = Number(btn.dataset.idx);
     if (Number.isFinite(idx)) setDetail(idx);
+}
+
+export function skipSentence() {
+    showLoader();
+    newSentence();
 }

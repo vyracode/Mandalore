@@ -206,64 +206,67 @@
 
                 <!-- TRANSLATION -->
                 <div id="screen-translate" class="translate-layout hide">
-                    <div class="panel">
-                        <div class="ph">
-                            <h2>Translation</h2>
-                            <div class="seg" role="tablist" aria-label="Translation direction">
-                                <button id="dirENZH" data-on="true" role="tab" aria-selected="true" type="button">EN →
-                                    中文</button>
-                                <button id="dirZHEN" data-on="false" role="tab" aria-selected="false" type="button">中文 →
-                                    EN</button>
-                            </div>
-                        </div>
-                    </div>
-
                     <div class="translate-card">
-                        <!-- A -->
-                        <div id="translateA" style="display:flex; flex-direction:column; gap:12px; min-height:0;">
-                            <div class="prompt">
-                                <div class="label"><span class="k" aria-hidden="true"></span><span
-                                        id="translateLabel">Translate into 中文</span></div>
+                        <div id="translateContainer" style="display:flex; flex-direction:column; gap:12px; min-height:0;">
+                            <div class="prompt" id="translatePromptBox">
+                                <div class="label" style="justify-content:space-between; width:100%">
+                                    <span style="display:flex; align-items:center; gap:8px">
+                                        <span class="k" aria-hidden="true"></span>
+                                        <span id="translateLabel">Translate into 中文</span>
+                                    </span>
+                                    <div style="display:flex; gap:8px; align-items:center;">
+                                        <button class="btn ghost" id="btnSwitchDirection" type="button" style="font-size:12px; padding: 4px 10px;">中文 → EN</button>
+                                        <button class="btn ghost" id="btnSkipSentence" type="button" style="font-size:12px; padding: 4px 10px;">Skip</button>
+                                    </div>
+                                </div>
                                 <div class="txt" id="promptText">Welcome home. Do you want bread?</div>
                             </div>
 
-                            <div class="input-area">
-                                <textarea id="userTranslation" inputmode="text" enterkeyhint="send"
-                                    spellcheck="false" placeholder="Type Hanzi, Pinyin, and/or English"
-                                    aria-label="Your translation"></textarea>
-                                <div class="translate-actions">
-                                    <button class="btn ghost" id="btnNewSentence" type="button">New sentence</button>
-                                    <button class="btn primary" id="btnSubmitTranslation" type="button">Check</button>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- B -->
-                        <div id="translateB" class="feedback">
-                            <div class="prompt" style="gap:6px">
-                                <div class="label" style="justify-content:space-between; width:100%">
-                                    <span style="display:flex; align-items:center; gap:8px">
-                                        <span class="k"
-                                            style="background: var(--purple); box-shadow: 0 0 0 3px rgba(122,92,255,.14)"
-                                            aria-hidden="true"></span>
-                                        <span>Summary</span>
-                                    </span>
-                                    <button class="btn ghost" id="btnBackToInput" type="button">Back</button>
-                                </div>
-                                <div class="txt" id="fbOverview"
-                                    style="font-size:14px; font-weight:850; color: rgba(255,255,255,.86)">Nice
-                                    structure. Two word choices are off, and one word is missing.</div>
+                            <div class="input-area" id="translateInputArea">
+                                <input id="userTranslation" inputmode="text" enterkeyhint="go" type="text"
+                                    spellcheck="false" placeholder="Type Hanzi and/or Pinyin"
+                                    aria-label="Your translation" />
+                                <button class="btn primary" id="btnSubmitTranslation" type="button" style="width: 100%;">Check</button>
                             </div>
 
-                            <div class="prompt" style="gap:10px">
-                                <div class="sentence sentence-correct" id="fbSentence" aria-label="Per-word feedback">
+                            <!-- Feedback section (shown after submit) -->
+                            <div id="translateFeedback" class="translate-feedback" style="display:none;">
+                                <div id="translateLoader" class="translate-loader" style="display:none;">
+                                    <div class="loader-dots">
+                                        <span></span>
+                                        <span></span>
+                                        <span></span>
+                                    </div>
                                 </div>
-                            </div>
+                                <div id="feedbackContent" style="display:none;">
+                                    <div class="prompt">
+                                        <div class="label" style="justify-content:space-between; width:100%">
+                                            <span style="display:flex; align-items:center; gap:8px">
+                                                <span class="k"
+                                                    style="background: var(--purple); box-shadow: 0 0 0 3px rgba(122,92,255,.14)"
+                                                    aria-hidden="true"></span>
+                                                <span>Summary</span>
+                                            </span>
+                                        </div>
+                                        <div class="txt fb-overview" id="fbOverview">Nice
+                                            structure. Two word choices are off, and one word is missing.</div>
+                                    </div>
 
-                            <div class="detail" id="fbDetail" aria-live="polite" style="display:none">
-                                <div class="tag"><span class="k" aria-hidden="true"></span><span id="detailTag"></span>
+                                    <div class="prompt">
+                                        <div class="sentence sentence-correct" id="fbSentence" aria-label="Per-word feedback">
+                                        </div>
+                                    </div>
+
+                                    <div class="detail" id="fbDetail" aria-live="polite" style="display:none">
+                                        <div class="tag"><span class="k" aria-hidden="true"></span><span id="detailTag"></span>
+                                        </div>
+                                        <div class="dbody" id="detailBody"></div>
+                                    </div>
+
+                                    <div class="feedback-actions">
+                                        <button class="btn primary" id="btnNextSentence" type="button">Next</button>
+                                    </div>
                                 </div>
-                                <div class="dbody" id="detailBody"></div>
                             </div>
                         </div>
                     </div>

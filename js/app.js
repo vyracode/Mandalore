@@ -2,7 +2,7 @@ import { state, loadState, saveState } from './state.js';
 import { $, on } from './modules/utils.js';
 import { renderFront, nextCard, resetAllBack, bindModality } from './modules/flashcards.js';
 import { setTranslationDir, checkTranslation, newSentence, showTranslateA, handleFeedbackClick, renderFeedbackTokens } from './modules/translation.js';
-import { renderKeyStatus, handleImport, handleForgetList, forgetKey, saveKey, copyPrompt, renderModel, handleModelChange, triggerBrowse, handleFileSelect, clearCacheAndReload, loadVersionInfo, setupTextareaAutoResize } from './modules/settings.js';
+import { renderKeyStatus, handleImport, handleForgetList, forgetKey, saveKey, copyPrompt, renderModel, handleModelChange, triggerBrowse, handleFileSelect, clearCacheAndReload, loadVersionInfo, setupTextareaAutoResize, renderSentenceCount, viewSentences, closeModal, forgetSentences } from './modules/settings.js';
 
 
 function runSmokeTests() {
@@ -81,7 +81,13 @@ on('#btnImport', 'click', handleImport);
 on('#btnBrowse', 'click', triggerBrowse);
 on('#fileInput', 'change', handleFileSelect);
 on('#btnForgetList', 'click', handleForgetList);
+on('#btnViewSentences', 'click', viewSentences);
+on('#btnForgetSentences', 'click', forgetSentences);
 on('#btnClearCache', 'click', clearCacheAndReload);
+
+// Modal controls
+on('#btnCloseModal', 'click', closeModal);
+on('#modalOverlay', 'click', closeModal);
 
 // Reset UI removed as per request. Use individual Forget buttons.
 
@@ -97,6 +103,7 @@ nextCard(); // Will render empty state if no words
 setTranslationDir('ENZH');
 renderKeyStatus();
 renderModel();
+renderSentenceCount();
 renderFeedbackTokens();
 loadVersionInfo();
 setupTextareaAutoResize();

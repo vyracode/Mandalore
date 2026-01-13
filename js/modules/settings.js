@@ -497,3 +497,68 @@ export async function loadVersionInfo() {
         versionEl.innerHTML = 'v0.?&nbsp;&nbsp;|&nbsp;&nbsp;Unknown';
     }
 }
+
+export function renderSentenceCount() {
+    const countEl = $('#sentenceCount');
+    if (countEl) {
+        countEl.textContent = state.cachedSentences.length.toString();
+    }
+}
+
+export function viewSentences() {
+    const modal = $('#sentencesModal');
+    const container = $('#sentencesListContainer');
+    
+    if (!modal || !container) return;
+    
+    // Clear existing content
+    container.innerHTML = '';
+    
+    if (state.cachedSentences.length === 0) {
+        container.innerHTML = '<div style="padding: 20px; text-align: center; color: rgba(255,255,255,.5); font-weight: 650;">No sentences generated yet.</div>';
+    } else {
+        // Render sentences in reverse order (newest first)
+        const sentences = [...state.cachedSentences].reverse();
+        sentences.forEach(sentence => {
+            const item = document.createElement('div');
+            item.className = 'sentence-item';
+            
+            item.innerHTML = `
+                <div class="sentence-pair">
+                    <div class="sentence-lang">English</div>
+                    <div class="sentence-text">${sentence.promptEN || ''}</div>
+                </div>
+                <div class="sentence-pair">
+                    <div class="sentence-lang">中文</div>
+                    <div class="sentence-text zh">${sentence.promptZH || ''}</div>
+                </div>
+            `;
+            
+            container.appendChild(item);
+        });
+    }
+    
+    // Show modal
+    modal.style.display = 'flex';
+}
+
+export function closeModal() {
+    const modal = $('#sentencesModal');
+    if (modal) {
+        modal.style.display = 'none';
+    }
+}
+
+export function forgetSentences() {
+    if (!confirm('Forget all generated sentences?')) return;
+    
+    state.cachedSentences = [];
+    saveState();
+    renderSentenceCount();
+    
+    // If modal is open, update it
+    const modal = $('#sentencesModal');
+    if (modal && modal.style.display !== 'none') {
+        viewSentences();
+    }
+}

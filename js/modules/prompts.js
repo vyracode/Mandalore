@@ -1,7 +1,14 @@
 export const prompts = {
-    generateSentence: (words) => {
-        return `Generate a simple practice sentence using ONLY the following Mandarin words: [${words}]. 
+    generateSentence: (words, existingSentences = []) => {
+        let prompt = `Generate a simple practice sentence using ONLY the following Mandarin words: [${words}]. 
 Return a JSON object with: { "mandarin": "The sentence in Hanzi", "english": "The English translation" }.`;
+        
+        if (existingSentences.length > 0) {
+            const sentencesList = existingSentences.map((s, i) => `${i + 1}. "${s}"`).join('\n');
+            prompt += `\n\nIMPORTANT: Do NOT generate any of these existing sentences:\n${sentencesList}\n\nGenerate a NEW, DIFFERENT sentence that hasn't been used before.`;
+        }
+        
+        return prompt;
     },
 
     // ///////////////////////////////////////////////////////////////////////////

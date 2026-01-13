@@ -1,6 +1,7 @@
 import { state, saveState } from '../state.js';
 import { $, $$ } from './utils.js';
 import { prompts } from './prompts.js';
+import { renderSentenceCount } from './settings.js';
 
 // --- API ---
 
@@ -153,9 +154,18 @@ export async function newSentence() {
     if (promptDiv) promptDiv.style.opacity = '0.5';
 
     try {
+        // Get existing sentences from cache (up to 100 most recent)
+        const recentCached = state.cachedSentences.slice(-100);
+        
+        // Extract source language sentences based on translation direction
+        const isEnglishToChinese = state.translationDir === 'ENZH';
+        const existingSentences = recentCached
+            .map(cached => isEnglishToChinese ? cached.promptEN : cached.promptZH)
+            .filter(s => s && s.trim()); // Filter out empty/null sentences
+        
         // Construct prompt
         const words = state.wordlist.map(w => w.word).join(', ');
-        const prompt = prompts.generateSentence(words);
+        const prompt = prompts.generateSentence(words, existingSentences);
 
         const data = await callGemini(prompt);
 
@@ -166,10 +176,11 @@ export async function newSentence() {
             tokens: []
         };
 
-        // Save to cache (optional, based on specs but good for persistence)
+        // Save to cache (limit to 100 most recent)
         state.cachedSentences.push(state.translation);
-        if (state.cachedSentences.length > 50) state.cachedSentences.shift(); // Limit cache
+        if (state.cachedSentences.length > 100) state.cachedSentences.shift();
         saveState();
+        renderSentenceCount();
 
         // Update UI
         setTranslationDir(state.translationDir); // Refreshes text

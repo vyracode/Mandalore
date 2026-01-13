@@ -908,6 +908,73 @@ nav {
     display: none;
 }
 
+/* Error display */
+.translate-error {
+    display: none;
+    border-radius: 18px;
+    background: rgba(255, 79, 216, .12);
+    border: 1px solid rgba(255, 79, 216, .25);
+    padding: 14px 16px;
+    margin-bottom: 12px;
+}
+
+.error-content {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+}
+
+.error-icon {
+    font-size: 20px;
+    flex-shrink: 0;
+}
+
+.error-text {
+    flex: 1;
+    min-width: 0;
+}
+
+.error-title {
+    font-family: "Google Sans", system-ui, -apple-system, sans-serif;
+    font-size: 14px;
+    font-weight: 700;
+    color: rgba(255, 255, 255, .95);
+    line-height: 1.4;
+    margin-bottom: 4px;
+}
+
+.error-details {
+    font-size: 13px;
+    font-weight: 400;
+    color: rgba(255, 255, 255, .7);
+    line-height: 1.4;
+    margin-top: 6px;
+    white-space: pre-wrap;
+}
+
+.btn-close-error {
+    appearance: none;
+    border: 0;
+    background: rgba(255, 255, 255, .1);
+    width: 24px;
+    height: 24px;
+    border-radius: 8px;
+    color: rgba(255, 255, 255, .8);
+    font-size: 16px;
+    font-weight: 700;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    transition: all 0.15s ease;
+}
+
+.btn-close-error:hover {
+    background: rgba(255, 255, 255, .18);
+    color: rgba(255, 255, 255, 1);
+}
+
 .translate-loader {
     padding: 20px;
     text-align: center;

@@ -7,7 +7,10 @@ import { renderSentenceCount } from './settings.js';
 
 async function callGemini(prompt) {
     if (!state.apiKey) {
-        throw new Error("Missing API Key. Go to Settings to set it.");
+        throw { 
+            message: "Missing API Key", 
+            details: "Please go to Settings and add your Gemini API key to use Translation Practice." 
+        };
     }
     const isPreview = state.geminiModel.includes('preview') || state.geminiModel.includes('exp');
     const version = isPreview ? 'v1beta' : 'v1';
@@ -16,21 +19,65 @@ async function callGemini(prompt) {
         contents: [{ parts: [{ text: prompt }] }]
     };
 
-    const res = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-    });
-
-    if (!res.ok) {
-        const err = await res.text();
-        console.error('[Gemini API Error]', res.status, res.statusText, err);
-        throw new Error(`Gemini API Error: ${res.status} ${res.statusText}`);
+    let res;
+    try {
+        res = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+    } catch (e) {
+        throw { 
+            message: "Network Error", 
+            details: "Failed to connect to Gemini API. Please check your internet connection and try again." 
+        };
     }
 
-    const data = await res.json();
+    if (!res.ok) {
+        let errText = '';
+        try {
+            errText = await res.text();
+        } catch (e) {
+            errText = 'Unable to read error response';
+        }
+        console.error('[Gemini API Error]', res.status, res.statusText, errText);
+        
+        let errorMsg = `API Error (${res.status})`;
+        let errorDetails = '';
+        
+        if (res.status === 401) {
+            errorMsg = "Invalid API Key";
+            errorDetails = "Your Gemini API key appears to be invalid. Please check it in Settings.";
+        } else if (res.status === 429) {
+            errorMsg = "Rate Limit Exceeded";
+            errorDetails = "You've made too many requests. Please wait a moment and try again.";
+        } else if (res.status === 400) {
+            errorMsg = "Invalid Request";
+            errorDetails = "The request to Gemini was malformed. This might be a temporary issue.";
+        } else {
+            errorDetails = `Server returned: ${res.statusText}. ${errText ? 'Details: ' + errText.substring(0, 200) : ''}`;
+        }
+        
+        throw { message: errorMsg, details: errorDetails };
+    }
+
+    let data;
+    try {
+        data = await res.json();
+    } catch (e) {
+        throw { 
+            message: "Invalid Response", 
+            details: "Gemini API returned data that couldn't be parsed. Please try again." 
+        };
+    }
+    
     const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
-    if (!text) throw new Error("No response text from Gemini.");
+    if (!text) {
+        throw { 
+            message: "Empty Response", 
+            details: "Gemini API didn't return any text. The model might be unavailable. Please try again." 
+        };
+    }
 
     // Clean markdown code blocks and any preamble text
     let clean = text.trim();
@@ -51,11 +98,112 @@ async function callGemini(prompt) {
         return JSON.parse(clean);
     } catch (e) {
         console.error("Failed to parse JSON from Gemini", clean);
-        throw new Error("Gemini returned invalid JSON.");
+        throw { 
+            message: "Invalid JSON Response", 
+            details: "Gemini returned text that couldn't be parsed as JSON. This might be a temporary issue. Please try again." 
+        };
     }
 }
 
 // --- UI ---
+
+let errorTimeout = null;
+
+function showError(message, details = '') {
+    // Clear any existing timeout
+    if (errorTimeout) {
+        clearTimeout(errorTimeout);
+        errorTimeout = null;
+    }
+    
+    // Create or get error container
+    let errorContainer = $('#translateError');
+    if (!errorContainer) {
+        errorContainer = document.createElement('div');
+        errorContainer.id = 'translateError';
+        errorContainer.className = 'translate-error';
+        const container = $('#translateContainer');
+        if (container) {
+            container.insertBefore(errorContainer, container.firstChild);
+        }
+    }
+    
+    errorContainer.innerHTML = `
+        <div class="error-content">
+            <div class="error-icon">⚠️</div>
+            <div class="error-text">
+                <div class="error-title">${message}</div>
+                ${details ? `<div class="error-details">${details}</div>` : ''}
+            </div>
+            <button class="btn-close-error" type="button" aria-label="Close">✕</button>
+        </div>
+    `;
+    errorContainer.style.display = 'block';
+    
+    // Auto-hide after 8 seconds
+    errorTimeout = setTimeout(() => {
+        hideError();
+        errorTimeout = null;
+    }, 8000);
+    
+    // Close button handler
+    const closeBtn = errorContainer.querySelector('.btn-close-error');
+    if (closeBtn) {
+        closeBtn.addEventListener('click', () => {
+            if (errorTimeout) {
+                clearTimeout(errorTimeout);
+                errorTimeout = null;
+            }
+            hideError();
+        });
+    }
+}
+
+function hideError() {
+    const errorContainer = $('#translateError');
+    if (errorContainer) {
+        errorContainer.style.display = 'none';
+    }
+}
+
+function resetUIAfterError() {
+    const feedback = $('#translateFeedback');
+    const loader = $('#translateLoader');
+    const content = $('#feedbackContent');
+    const promptBox = $('#translatePromptBox');
+    const inputArea = $('#translateInputArea');
+    const input = $('#userTranslation');
+    const btn = $('#btnSubmitTranslation');
+    const skipBtn = $('#btnSkipSentence');
+    const nextBtn = $('#btnNextSentence');
+    const switchBtn = $('#btnSwitchDirection');
+    const promptDiv = $('#promptText');
+    
+    // Hide loader and feedback
+    if (feedback) feedback.style.display = 'none';
+    if (loader) loader.style.display = 'none';
+    if (content) content.style.display = 'none';
+    
+    // Show prompt and input
+    if (promptBox) promptBox.style.display = '';
+    if (inputArea) inputArea.style.display = '';
+    
+    // Re-enable input
+    if (input) {
+        input.disabled = false;
+    }
+    
+    // Show buttons
+    if (btn) btn.style.display = 'block';
+    if (skipBtn) skipBtn.style.display = 'block';
+    if (switchBtn) switchBtn.style.display = 'block';
+    
+    // Hide next button (only shown after successful grading)
+    if (nextBtn) nextBtn.style.display = 'none';
+    
+    // Restore prompt opacity
+    if (promptDiv) promptDiv.style.opacity = '1';
+}
 
 export function setTranslationDir(dir) {
     state.translationDir = dir;
@@ -145,6 +293,7 @@ export function showTranslateA() {
         input.value = '';
         input.focus({ preventScroll: true });
     }
+    hideError();
     if (feedback) feedback.style.display = 'none';
     if (promptBox) promptBox.style.display = '';
     if (inputArea) inputArea.style.display = '';
@@ -238,18 +387,17 @@ export async function newSentence() {
         renderSentenceCount();
 
         // Update UI and reset
+        hideError();
         setTranslationDir(state.translationDir); // Refreshes text
         showTranslateA(); // Resets input and hides feedback
 
     } catch (e) {
-        alert(e.message);
-        // Re-show buttons on error
-        const switchBtn = $('#btnSwitchDirection');
-        if (nextBtn) nextBtn.style.display = 'block';
-        if (skipBtn) skipBtn.style.display = 'block';
-        if (switchBtn) switchBtn.style.display = 'block';
-        const feedback = $('#translateFeedback');
-        if (feedback) feedback.style.display = 'none';
+        // Handle error object with message/details or plain Error
+        const errorMessage = e.message || 'An error occurred';
+        const errorDetails = e.details || (e.message && e.message !== errorMessage ? e.message : '');
+        
+        showError(errorMessage, errorDetails);
+        resetUIAfterError();
     } finally {
         if (promptDiv) promptDiv.style.opacity = '1';
     }
@@ -281,19 +429,16 @@ export async function checkTranslation() {
         state.translation.feedbackOverview = data.overview;
         state.translation.tokens = data.words;
 
+        hideError();
         showFeedback();
 
     } catch (e) {
-        alert(e.message);
-        // Re-enable on error
-        input.disabled = false;
-        btn.style.display = 'block';
-        const feedback = $('#translateFeedback');
-        if (feedback) feedback.style.display = 'none';
-        const skipBtn = $('#btnSkipSentence');
-        const switchBtn = $('#btnSwitchDirection');
-        if (skipBtn) skipBtn.style.display = 'block';
-        if (switchBtn) switchBtn.style.display = 'block';
+        // Handle error object with message/details or plain Error
+        const errorMessage = e.message || 'Failed to grade translation';
+        const errorDetails = e.details || (e.message && e.message !== errorMessage ? e.message : 'Please try again.');
+        
+        showError(errorMessage, errorDetails);
+        resetUIAfterError();
     }
 }
 

@@ -30,7 +30,8 @@ export const state = {
     apiKey: '',
     geminiModel: 'gemini-2.0-flash',
     cachedSentences: [], // [ { promptEN, promptZH, feedbackOverview, tokens } ]
-    fsrsCards: {} // Map of cardKey -> FSRS card data: { wordId_front -> card }
+    fsrsCards: {}, // Map of cardKey -> FSRS card data: { wordId_front -> card }
+    lastWordId: '' // Track last word ID shown to avoid showing same word twice in a row
 };
 
 const STORAGE_KEY = 'mandalore_state_v1';

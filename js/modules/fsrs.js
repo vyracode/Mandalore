@@ -129,9 +129,10 @@ export function recordReview(card, now = new Date(), rating) {
  * Get the next card to review based on FSRS scheduling
  * @param {Array} wordlist - List of words
  * @param {Object} fsrsCards - Map of FSRS cards
+ * @param {string} lastWordId - Last word ID shown (to avoid showing same word twice in a row)
  * @returns {Object|null} - { word, front, card } or null if no cards due
  */
-export function getNextCard(wordlist, fsrsCards) {
+export function getNextCard(wordlist, fsrsCards, lastWordId = '') {
     if (!wordlist || wordlist.length === 0) return null;
     
     const now = new Date();
@@ -141,6 +142,9 @@ export function getNextCard(wordlist, fsrsCards) {
     for (const word of wordlist) {
         const wordId = word.id;
         if (!wordId) continue;
+        
+        // Skip if this is the same word as the last one shown
+        if (lastWordId && wordId === lastWordId) continue;
         
         for (const front of FRONT_TYPES) {
             const card = getOrCreateCard(wordId, front, fsrsCards);
@@ -162,12 +166,42 @@ export function getNextCard(wordlist, fsrsCards) {
         }
     }
     
+    // If no cards available after filtering, allow the same word (fallback)
+    if (dueCards.length === 0 && lastWordId) {
+        // Re-collect without filtering
+        for (const word of wordlist) {
+            const wordId = word.id;
+            if (!wordId) continue;
+            
+            for (const front of FRONT_TYPES) {
+                const card = getOrCreateCard(wordId, front, fsrsCards);
+                if (!card) continue;
+                
+                const dueDate = card.due ? new Date(card.due) : new Date(0);
+                const isDue = dueDate <= now;
+                
+                if (isDue || !card.last_review) {
+                    dueCards.push({
+                        word,
+                        front,
+                        card,
+                        dueDate,
+                        priority: isDue ? (now - dueDate) : Infinity
+                    });
+                }
+            }
+        }
+    }
+    
     if (dueCards.length === 0) {
-        // No cards due, return earliest upcoming card
+        // No cards due, return earliest upcoming card (excluding last word if possible)
         const upcomingCards = [];
         for (const word of wordlist) {
             const wordId = word.id;
             if (!wordId) continue;
+            
+            // Skip if this is the same word as the last one shown
+            if (lastWordId && wordId === lastWordId) continue;
             
             for (const front of FRONT_TYPES) {
                 const card = getOrCreateCard(wordId, front, fsrsCards);
@@ -180,6 +214,27 @@ export function getNextCard(wordlist, fsrsCards) {
                     card,
                     dueDate
                 });
+            }
+        }
+        
+        // If no upcoming cards after filtering, allow the same word (fallback)
+        if (upcomingCards.length === 0 && lastWordId) {
+            for (const word of wordlist) {
+                const wordId = word.id;
+                if (!wordId) continue;
+                
+                for (const front of FRONT_TYPES) {
+                    const card = getOrCreateCard(wordId, front, fsrsCards);
+                    if (!card) continue;
+                    
+                    const dueDate = card.due ? new Date(card.due) : new Date();
+                    upcomingCards.push({
+                        word,
+                        front,
+                        card,
+                        dueDate
+                    });
+                }
             }
         }
         

@@ -179,17 +179,30 @@ export function nextCard() {
         // Empty state
         state.card.word = null;
         state.card.id = '';
+        state.lastWordId = '';
         renderFront();
         resetAllBack();
         return;
     }
 
-    // Use FSRS to get the next card to review
-    const next = getNextCard(state.wordlist, state.fsrsCards);
+    // Use FSRS to get the next card to review (excluding last word shown)
+    const next = getNextCard(state.wordlist, state.fsrsCards, state.lastWordId);
     
     if (!next) {
-        // Fallback to random if FSRS fails
-        const item = state.wordlist[Math.floor(Math.random() * state.wordlist.length)];
+        // Fallback to random if FSRS fails (avoiding last word if possible)
+        let availableWords = state.wordlist;
+        if (state.lastWordId && state.wordlist.length > 1) {
+            availableWords = state.wordlist.filter(w => {
+                const wordId = w.id || generateWordId(w.word, w.pinyinToned);
+                return wordId !== state.lastWordId;
+            });
+            // If filtering removed all words, use original list
+            if (availableWords.length === 0) {
+                availableWords = state.wordlist;
+            }
+        }
+        
+        const item = availableWords[Math.floor(Math.random() * availableWords.length)];
         const front = FRONT_ORDER[Math.floor(Math.random() * FRONT_ORDER.length)];
         
         state.card.id = item.id || generateWordId(item.word, item.pinyinToned);
@@ -199,6 +212,7 @@ export function nextCard() {
         state.card.tones = item.tones;
         state.card.meaning = item.meaning;
         state.card.front = front;
+        state.lastWordId = state.card.id;
     } else {
         // Use FSRS-selected card
         const item = next.word;
@@ -211,6 +225,7 @@ export function nextCard() {
         state.card.tones = item.tones;
         state.card.meaning = item.meaning;
         state.card.front = front;
+        state.lastWordId = state.card.id; // Track this word as the last shown
         
         // Store the FSRS card for this word+front combination
         const cardKey = getCardKey(state.card.id, front);
@@ -313,7 +328,11 @@ function resetModality(modCard) {
         b.dataset.picked = 'false';
         delete b.dataset.grade;
     });
-    $$('input', modCard).forEach(i => { i.value = ''; });
+    $$('input', modCard).forEach(i => { 
+        i.value = '';
+        i.disabled = false;
+        i.style.opacity = '';
+    });
     
     // Clear result indicators
     $$('.checked-result', modCard).forEach(r => { 
@@ -347,9 +366,12 @@ function resetModality(modCard) {
         });
     }
     
-    // Reset Hanzi Typing validation state
+    // Reset validation state
     if (modCard.id === 'modHanziTyping') {
         validateHanziTypingInput(modCard);
+    }
+    if (modCard.id === 'modPinyin') {
+        validatePinyinInput(modCard);
     }
 }
 
@@ -534,6 +556,7 @@ function checkSpeech(modCard) {
 function checkPinyin(modCard) {
     const inputEl = $('[data-input="pinyin"]', modCard);
     const ans = $('[data-role="pinyinAnswer"]', modCard);
+    const inputRow = $('.mod-input', modCard);
     if (!inputEl || !ans) return;
 
     const input = inputEl.value.trim().toLowerCase();
@@ -549,18 +572,29 @@ function checkPinyin(modCard) {
     }
     
     showResult(modCard, ok, ok ? 'Right' : 'Wrong', 'pinyin');
-    ans.innerHTML = `<strong>Answer:</strong> ${correct}`;
     
     if (ok) {
+        // Right: hide input, show answer (normal behavior)
         modCard.classList.add('is-correct');
+        ans.innerHTML = `<strong>Answer:</strong> ${correct}`;
         bumpSession(1);
+    } else {
+        // Wrong: keep input visible but disabled, show answer for comparison
+        if (inputRow) {
+            inputRow.style.display = 'flex';
+        }
+        if (inputEl) {
+            inputEl.disabled = true;
+            inputEl.style.opacity = '0.5';
+        }
+        ans.innerHTML = `<strong>Correct:</strong> ${correct}`;
     }
-    // If wrong, Cover button is visible and allows retry
 }
 
 // Cover the answer and allow retry (Look, Cover, Write, Check, Repeat)
 function coverPinyin(modCard) {
     const inputEl = $('[data-input="pinyin"]', modCard);
+    const inputRow = $('.mod-input', modCard);
     
     // Switch back to input state
     modCard.dataset.state = 'input';
@@ -568,10 +602,19 @@ function coverPinyin(modCard) {
     // Don't reset performance tracking - FSRS only counts initial attempt
     // The cover-write-check loop is for practice only
     
-    // Clear input for retry
+    // Re-enable and reset input
     if (inputEl) {
+        inputEl.disabled = false;
+        inputEl.style.opacity = '';
         inputEl.value = '';
         inputEl.focus();
+        // Re-check for Hanzi characters after clearing
+        validatePinyinInput(modCard);
+    }
+    
+    // Reset input row display (let CSS handle it)
+    if (inputRow) {
+        inputRow.style.display = '';
     }
     
     // Clear result indicator
@@ -739,6 +782,42 @@ function validateHanziTypingInput(modCard) {
     }
 }
 
+/**
+ * Check if input contains Hanzi characters and show reminder/disable check button
+ */
+function validatePinyinInput(modCard) {
+    const inputEl = $('[data-input="pinyin"]', modCard);
+    const checkBtn = $('#btnCheckPinyin', modCard) || $('[data-action="checkPinyin"]', modCard);
+    const hintEl = $('#pinyinHint', modCard);
+    
+    if (!inputEl) return;
+    
+    const value = inputEl.value;
+    // Check for Hanzi characters (CJK Unified Ideographs)
+    const hasHanzi = /[\u4e00-\u9fff]/.test(value);
+    
+    if (hasHanzi) {
+        // Show polite reminder
+        if (hintEl) {
+            hintEl.textContent = 'This field is for typing Pinyin spelling (latin letters only). Please type the pronunciation, not the Hanzi characters.';
+            hintEl.style.display = 'block';
+        }
+        // Disable check button
+        if (checkBtn) {
+            checkBtn.disabled = true;
+        }
+    } else {
+        // Hide reminder
+        if (hintEl) {
+            hintEl.style.display = 'none';
+        }
+        // Enable check button
+        if (checkBtn) {
+            checkBtn.disabled = false;
+        }
+    }
+}
+
 // Separate into individual Hanzi choice and Pinyin spelling inputs
 function separateInputs() {
     inputsSeparated = true;
@@ -785,7 +864,11 @@ export function bindModality(modCard) {
                 checkTone(modCard);
             } else if (input.matches('[data-input="pinyin"]')) {
                 e.preventDefault();
-                checkPinyin(modCard);
+                // Only allow check if no Hanzi characters
+                const checkBtn = $('#btnCheckPinyin', modCard) || $('[data-action="checkPinyin"]', modCard);
+                if (checkBtn && !checkBtn.disabled) {
+                    checkPinyin(modCard);
+                }
             } else if (input.matches('[data-input="hanziTyping"]')) {
                 e.preventDefault();
                 // Only allow check if no latin characters
@@ -804,6 +887,16 @@ export function bindModality(modCard) {
             inputEl.addEventListener('input', () => validateHanziTypingInput(modCard));
             // Initial validation
             validateHanziTypingInput(modCard);
+        }
+    }
+    
+    // Add input validation for Pinyin Spelling
+    if (modCard.id === 'modPinyin') {
+        const inputEl = $('[data-input="pinyin"]', modCard);
+        if (inputEl) {
+            inputEl.addEventListener('input', () => validatePinyinInput(modCard));
+            // Initial validation
+            validatePinyinInput(modCard);
         }
     }
 }

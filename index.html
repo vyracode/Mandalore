@@ -348,6 +348,18 @@
                         <div class="setting-card">
                             <div class="setting-row">
                                 <div>
+                                    <div class="label">FSRS-6 Statistics</div>
+                                    <div class="hint">Spaced repetition learning stats</div>
+                                </div>
+                            </div>
+                            <div id="fsrsStatsContainer" style="margin-top: 12px;">
+                                <!-- Stats will be rendered here -->
+                            </div>
+                        </div>
+
+                        <div class="setting-card">
+                            <div class="setting-row">
+                                <div>
                                     <div class="label">Cache & Reload</div>
                                     <div class="hint">Clear browser cache and reload page (like Ctrl+F5)</div>
                                 </div>
@@ -399,6 +411,7 @@
         </div>
     </div>
 
+    <script src="js/lib/ts-fsrs.js"></script>
     <script type="module" src="js/app.js"></script>
 </body>
 

@@ -1,7 +1,8 @@
-import { state, bumpSession } from '../state.js';
+import { state, bumpSession, saveState } from '../state.js';
 import { $, $$ } from './utils.js';
 import getCandidates from '../lib/pinyin-ime.esm.js';
 import { generateWordId } from './wordId.js';
+import { getCardKey, getOrCreateCard, getNextCard, recordReview } from './fsrs.js';
 
 const FRONT_ORDER = ['hanzi', 'pronunciation', 'meaning'];
 const FRONT_LABEL = { hanzi: 'Hanzi', pronunciation: 'Audio', pinyin: 'Pinyin', meaning: 'Meaning' };
@@ -9,6 +10,12 @@ const FRONT_HINT = { hanzi: 'Recognize the word', pronunciation: 'Recognize the 
 
 // Track if user has separated inputs for current card (resets on next card)
 let inputsSeparated = false;
+
+// Track card performance for FSRS review
+let cardPerformance = {
+    gradedModalities: {}, // modality -> ok (true/false)
+    selfGradedModalities: {} // modality -> ok (true/false/undefined)
+};
 
 // FlashCardo audio mappings: wordId -> audioNum
 let flashCardoMappings = null;
@@ -160,6 +167,11 @@ function generateHanziChoices(targetWord, targetPinyin, count = 5) {
 }
 
 export function nextCard() {
+    // Record review for previous card if it exists
+    if (state.card.word && state.card.id) {
+        recordCardReview();
+    }
+    
     // Reset separated state for new card
     inputsSeparated = false;
     
@@ -172,23 +184,38 @@ export function nextCard() {
         return;
     }
 
-    // Pick random word
-    const item = state.wordlist[Math.floor(Math.random() * state.wordlist.length)];
-
-    // Pick random front
-    const front = FRONT_ORDER[Math.floor(Math.random() * FRONT_ORDER.length)];
-
-    // Use stored id, or generate on-the-fly for legacy wordlists without ids
-    state.card.id = item.id || generateWordId(item.word, item.pinyinToned);
-    state.card.word = item.word;
-    state.card.pinyinToned = item.pinyinToned;
-    state.card.pinyinBare = item.pinyinBare;
-    state.card.tones = item.tones;
-    state.card.meaning = item.meaning;
-    state.card.front = front;
-
-    // For audio front, we should label it?
-    // Already handled by renderFront logic logic
+    // Use FSRS to get the next card to review
+    const next = getNextCard(state.wordlist, state.fsrsCards);
+    
+    if (!next) {
+        // Fallback to random if FSRS fails
+        const item = state.wordlist[Math.floor(Math.random() * state.wordlist.length)];
+        const front = FRONT_ORDER[Math.floor(Math.random() * FRONT_ORDER.length)];
+        
+        state.card.id = item.id || generateWordId(item.word, item.pinyinToned);
+        state.card.word = item.word;
+        state.card.pinyinToned = item.pinyinToned;
+        state.card.pinyinBare = item.pinyinBare;
+        state.card.tones = item.tones;
+        state.card.meaning = item.meaning;
+        state.card.front = front;
+    } else {
+        // Use FSRS-selected card
+        const item = next.word;
+        const front = next.front;
+        
+        state.card.id = item.id || generateWordId(item.word, item.pinyinToned);
+        state.card.word = item.word;
+        state.card.pinyinToned = item.pinyinToned;
+        state.card.pinyinBare = item.pinyinBare;
+        state.card.tones = item.tones;
+        state.card.meaning = item.meaning;
+        state.card.front = front;
+        
+        // Store the FSRS card for this word+front combination
+        const cardKey = getCardKey(state.card.id, front);
+        state.fsrsCards[cardKey] = next.card;
+    }
 
     renderFront();
     resetAllBack();
@@ -321,6 +348,62 @@ function resetModality(modCard) {
     }
 }
 
+/**
+ * Record FSRS review for the current card based on performance
+ */
+function recordCardReview() {
+    if (!state.card.word || !state.card.id || !state.card.front) return;
+    
+    // Determine overall performance
+    // Good (Right) if all graded modalities passed
+    // Again (Wrong) if any graded modality failed
+    let allGradedPassed = true;
+    const gradedKeys = Object.keys(cardPerformance.gradedModalities);
+    
+    if (gradedKeys.length === 0) {
+        // No graded modalities completed, don't record review
+        // (User might have skipped the card without answering)
+        return;
+    }
+    
+    // Check if all graded modalities passed
+    for (const modality of gradedKeys) {
+        if (cardPerformance.gradedModalities[modality] !== true) {
+            allGradedPassed = false;
+            break;
+        }
+    }
+    
+    // Get or create FSRS card
+    const cardKey = getCardKey(state.card.id, state.card.front);
+    let fsrsCard = getOrCreateCard(state.card.id, state.card.front, state.fsrsCards);
+    
+    if (!fsrsCard) {
+        // FSRS library might not be loaded, skip recording
+        console.warn('FSRS card creation failed, skipping review recording');
+        return;
+    }
+    
+    // Record review: 3 = Good (Right), 1 = Again (Wrong)
+    const rating = allGradedPassed ? 3 : 1;
+    const result = recordReview(fsrsCard, new Date(), rating);
+    
+    if (result && result.card) {
+        // Update stored card
+        state.fsrsCards[cardKey] = result.card;
+        saveState();
+        // Note: FSRS stats will update when user switches to settings tab
+    } else {
+        console.warn('FSRS review recording failed');
+    }
+    
+    // Reset performance tracking
+    cardPerformance = {
+        gradedModalities: {},
+        selfGradedModalities: {}
+    };
+}
+
 export function resetAllBack() {
     // Map front types to mod-card selectors
     const frontToMod = {
@@ -412,6 +495,9 @@ function checkTone(modCard) {
     // Switch to checked state
     toneBlock.dataset.pronState = 'checked';
     
+    // Track performance for FSRS
+    cardPerformance.gradedModalities['tone'] = ok;
+    
     showResult(modCard, ok, ok ? 'Right' : 'Wrong', 'tone');
     bumpSession(ok ? 1 : 0);
 
@@ -452,6 +538,9 @@ function checkPinyin(modCard) {
     // Switch to checked state
     modCard.dataset.state = 'checked';
     
+    // Track performance for FSRS
+    cardPerformance.gradedModalities['pinyin'] = ok;
+    
     showResult(modCard, ok, ok ? 'Right' : 'Wrong', 'pinyin');
     ans.innerHTML = `<strong>Answer:</strong> ${correct}`;
     
@@ -468,6 +557,9 @@ function coverPinyin(modCard) {
     
     // Switch back to input state
     modCard.dataset.state = 'input';
+    
+    // Reset performance tracking for this modality
+    delete cardPerformance.gradedModalities['pinyin'];
     
     // Clear input for retry
     if (inputEl) {
@@ -507,6 +599,10 @@ function pickHanzi(modCard, btn) {
 
     // Switch to checked state (shows result in header)
     modCard.dataset.state = 'checked';
+    
+    // Track performance for FSRS
+    cardPerformance.gradedModalities['hanzi'] = ok;
+    
     showResult(modCard, ok, ok ? 'Right' : 'Wrong', 'hanzi');
     bumpSession(ok ? 1 : 0);
 }
@@ -532,6 +628,9 @@ function checkMeaning(modCard) {
 }
 
 function selfGrade(modCard, ok, role) {
+    // Track performance for FSRS (self-graded modalities)
+    cardPerformance.selfGradedModalities[role] = ok;
+    
     showResult(modCard, ok, ok ? 'Right' : 'Wrong', role);
     bumpSession(ok ? 1 : 0);
     
@@ -555,6 +654,9 @@ function checkHanziTyping(modCard) {
     // Switch to checked state
     modCard.dataset.state = 'checked';
     
+    // Track performance for FSRS (hanziTyping tests both hanzi and pinyin)
+    cardPerformance.gradedModalities['hanziTyping'] = ok;
+    
     showResult(modCard, ok, ok ? 'Right' : 'Wrong', 'hanziTyping');
     ans.innerHTML = `<strong>Answer:</strong> ${correct} <span style="color: rgba(255,255,255,.5); margin-left: 8px">(${state.card.pinyinToned})</span>`;
     
@@ -572,6 +674,9 @@ function coverHanziTyping(modCard) {
     
     // Switch back to input state
     modCard.dataset.state = 'input';
+    
+    // Reset performance tracking for this modality
+    delete cardPerformance.gradedModalities['hanziTyping'];
     
     // Clear input for retry
     if (inputEl) {

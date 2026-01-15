@@ -60,10 +60,10 @@ Multimodal Flashcards conceptualize of words across 4 modalities:
 - Pinyin Spelling (Excluding Tones)
 - Meaning
 
-A flashcard for a given word randomly selects one of these modalities to display (The *Front*), and the user must provide the correct responses for each of the other modalities (The *Back*).
+A flashcard for a given word randomly selects one of three modalities to display as the *Front* (Hanzi, Pronunciation, or Meaning). Pinyin Spelling is not used as a front modality. The user must provide the correct responses for each of the other modalities (The *Back*).
 Some of these modalities are graded (Tone, Pinyin Spelling), and others rely on the user to self-grade (Full Pronunciation, Meaning).
 
-The flashcards utilize FSRS-6 for Spacing. For the purposes of FSRS-6, we consider each of the possible fronts for a given word as distinct cards.
+The flashcards utilize FSRS-6 for Spacing. For the purposes of FSRS-6, we consider each of the possible fronts for a given word (3 fronts: Hanzi, Pronunciation, Meaning) as distinct cards.
 For the sake of simplicity, we combine the FSRS-6 grades down to a binary, by only using "Good" (Renamed as "Right") and "Again" (Renamed as "Wrong"), disusing "Easy" and "Hard" entirely.
 
 For self-grade modalities, we display "Right" and "Wrong" buttons with the reveal of the correct answer.
@@ -80,7 +80,7 @@ For self-grade modalities, we display "Right" and "Wrong" buttons with the revea
         - Eg: 欢迎 (Huānyíng) = 12, 为什么 (wèishénme) = 425
         - When the user clicks "Reveal", the correct pronunciation is provided as audio.
 - Pinyin Spelling:
-    - When Front: Pinyin Spelling is provided (with tones), user is expected to recognize.
+    - Pinyin Spelling is never used as a front modality.
     - When Back: User types the pinyin spelling (without tones), graded (pass or fail).
         - When the user clicks "Reveal", the correct pinyin spelling is shown.
     - Notes: 

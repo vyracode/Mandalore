@@ -2,7 +2,7 @@ import { state, loadState, saveState } from './state.js';
 import { $, on } from './modules/utils.js';
 import { renderFront, nextCard, resetAllBack, bindModality } from './modules/flashcards.js';
 import { setTranslationDir, checkTranslation, newSentence, showTranslateA, handleFeedbackClick, renderFeedbackTokens, skipSentence, switchTranslationDir } from './modules/translation.js';
-import { renderKeyStatus, handleImport, handleForgetList, forgetKey, saveKey, copyPrompt, renderModel, handleModelChange, triggerBrowse, handleFileSelect, clearCacheAndReload, loadVersionInfo, setupTextareaAutoResize, renderSentenceCount, viewSentences, closeModal, forgetSentences } from './modules/settings.js';
+import { renderKeyStatus, handleImport, handleForgetList, forgetKey, saveKey, copyPrompt, renderModel, handleModelChange, triggerBrowse, handleFileSelect, clearCacheAndReload, loadVersionInfo, setupTextareaAutoResize, renderSentenceCount, viewSentences, closeModal, forgetSentences, renderFSRSStats } from './modules/settings.js';
 
 
 function runSmokeTests() {
@@ -40,6 +40,11 @@ function setTab(tab) {
 
     const fab = $('#btnFabNext');
     if (fab) fab.classList.toggle('hide', tab !== 'flash');
+    
+    // Update FSRS stats when settings tab is shown
+    if (tab === 'settings') {
+        renderFSRSStats();
+    }
 }
 
 // Tabs
@@ -113,6 +118,7 @@ setTranslationDir('ENZH');
 renderKeyStatus();
 renderModel();
 renderSentenceCount();
+renderFSRSStats();
 renderFeedbackTokens();
 loadVersionInfo();
 setupTextareaAutoResize();

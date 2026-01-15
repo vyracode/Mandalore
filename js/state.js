@@ -29,19 +29,31 @@ export const state = {
     imported: { deckName: 'My Wordlist' },
     apiKey: '',
     geminiModel: 'gemini-2.0-flash',
-    cachedSentences: [] // [ { promptEN, promptZH, feedbackOverview, tokens } ]
+    cachedSentences: [], // [ { promptEN, promptZH, feedbackOverview, tokens } ]
+    fsrsCards: {} // Map of cardKey -> FSRS card data: { wordId_front -> card }
 };
 
 const STORAGE_KEY = 'mandalore_state_v1';
 
 export function saveState() {
     try {
+        // Serialize FSRS cards (convert Date objects to ISO strings)
+        const serializedFsrsCards = {};
+        for (const [key, card] of Object.entries(state.fsrsCards)) {
+            serializedFsrsCards[key] = {
+                ...card,
+                due: card.due ? card.due.toISOString() : null,
+                last_review: card.last_review ? card.last_review.toISOString() : null
+            };
+        }
+        
         const data = {
             wordlist: state.wordlist,
             deckName: state.imported.deckName,
             apiKey: state.apiKey,
             geminiModel: state.geminiModel,
-            cachedSentences: state.cachedSentences
+            cachedSentences: state.cachedSentences,
+            fsrsCards: serializedFsrsCards
         };
         localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
     } catch (e) {
@@ -63,6 +75,21 @@ export function loadState() {
         if (data.apiKey) state.apiKey = data.apiKey;
         if (data.geminiModel) state.geminiModel = data.geminiModel;
         if (Array.isArray(data.cachedSentences)) state.cachedSentences = data.cachedSentences;
+        
+        // Deserialize FSRS cards (convert ISO strings to Date objects)
+        if (data.fsrsCards && typeof data.fsrsCards === 'object') {
+            state.fsrsCards = {};
+            for (const [key, card] of Object.entries(data.fsrsCards)) {
+                state.fsrsCards[key] = {
+                    ...card,
+                    due: card.due ? new Date(card.due) : new Date(),
+                    last_review: card.last_review ? new Date(card.last_review) : undefined
+                };
+            }
+        } else {
+            state.fsrsCards = {};
+        }
+        
         return true;
     } catch (e) {
         console.error('Failed to load state', e);

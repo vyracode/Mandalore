@@ -557,6 +557,7 @@ function checkPinyin(modCard) {
     const inputEl = $('[data-input="pinyin"]', modCard);
     const ans = $('[data-role="pinyinAnswer"]', modCard);
     const inputRow = $('.mod-input', modCard);
+    const checkBtn = $('#btnCheckPinyin', modCard) || $('[data-action="checkPinyin"]', modCard);
     if (!inputEl || !ans) return;
 
     const input = inputEl.value.trim().toLowerCase();
@@ -587,6 +588,10 @@ function checkPinyin(modCard) {
             inputEl.disabled = true;
             inputEl.style.opacity = '0.5';
         }
+        // Hide Check button since we've already checked
+        if (checkBtn) {
+            checkBtn.style.display = 'none';
+        }
         ans.innerHTML = `<strong>Correct:</strong> ${correct}`;
     }
 }
@@ -595,6 +600,7 @@ function checkPinyin(modCard) {
 function coverPinyin(modCard) {
     const inputEl = $('[data-input="pinyin"]', modCard);
     const inputRow = $('.mod-input', modCard);
+    const checkBtn = $('#btnCheckPinyin', modCard) || $('[data-action="checkPinyin"]', modCard);
     
     // Switch back to input state
     modCard.dataset.state = 'input';
@@ -615,6 +621,11 @@ function coverPinyin(modCard) {
     // Reset input row display (let CSS handle it)
     if (inputRow) {
         inputRow.style.display = '';
+    }
+    
+    // Show Check button again
+    if (checkBtn) {
+        checkBtn.style.display = '';
     }
     
     // Clear result indicator

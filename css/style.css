@@ -129,6 +129,12 @@ nav {
     transform: translateY(1px)
 }
 
+.btn:disabled {
+    opacity: .4;
+    cursor: not-allowed;
+    pointer-events: none;
+}
+
 .btn.primary {
     background: linear-gradient(135deg, rgba(255, 79, 216, .22), rgba(122, 92, 255, .22));
     border-color: rgba(255, 255, 255, .14);

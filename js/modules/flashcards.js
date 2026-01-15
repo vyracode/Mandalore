@@ -346,6 +346,11 @@ function resetModality(modCard) {
             }
         });
     }
+    
+    // Reset Hanzi Typing validation state
+    if (modCard.id === 'modHanziTyping') {
+        validateHanziTypingInput(modCard);
+    }
 }
 
 /**
@@ -538,8 +543,10 @@ function checkPinyin(modCard) {
     // Switch to checked state
     modCard.dataset.state = 'checked';
     
-    // Track performance for FSRS
-    cardPerformance.gradedModalities['pinyin'] = ok;
+    // Track performance for FSRS (only record initial attempt)
+    if (cardPerformance.gradedModalities['pinyin'] === undefined) {
+        cardPerformance.gradedModalities['pinyin'] = ok;
+    }
     
     showResult(modCard, ok, ok ? 'Right' : 'Wrong', 'pinyin');
     ans.innerHTML = `<strong>Answer:</strong> ${correct}`;
@@ -558,8 +565,8 @@ function coverPinyin(modCard) {
     // Switch back to input state
     modCard.dataset.state = 'input';
     
-    // Reset performance tracking for this modality
-    delete cardPerformance.gradedModalities['pinyin'];
+    // Don't reset performance tracking - FSRS only counts initial attempt
+    // The cover-write-check loop is for practice only
     
     // Clear input for retry
     if (inputEl) {
@@ -654,11 +661,14 @@ function checkHanziTyping(modCard) {
     // Switch to checked state
     modCard.dataset.state = 'checked';
     
-    // Track performance for FSRS (hanziTyping tests both hanzi and pinyin)
-    cardPerformance.gradedModalities['hanziTyping'] = ok;
+    // Track performance for FSRS (only record initial attempt)
+    // hanziTyping tests both hanzi and pinyin
+    if (cardPerformance.gradedModalities['hanziTyping'] === undefined) {
+        cardPerformance.gradedModalities['hanziTyping'] = ok;
+    }
     
     showResult(modCard, ok, ok ? 'Right' : 'Wrong', 'hanziTyping');
-    ans.innerHTML = `<strong>Answer:</strong> ${correct} <span style="color: rgba(255,255,255,.5); margin-left: 8px">(${state.card.pinyinToned})</span>`;
+    ans.innerHTML = `<strong>Answer:</strong> ${correct} <span style="color: rgba(255,255,255,.5); margin-left: 8px">(${state.card.pinyinBare || ''})</span>`;
     
     if (ok) {
         modCard.classList.add('is-correct');
@@ -675,19 +685,57 @@ function coverHanziTyping(modCard) {
     // Switch back to input state
     modCard.dataset.state = 'input';
     
-    // Reset performance tracking for this modality
-    delete cardPerformance.gradedModalities['hanziTyping'];
+    // Don't reset performance tracking - FSRS only counts initial attempt
+    // The cover-write-check loop is for practice only
     
     // Clear input for retry
     if (inputEl) {
         inputEl.value = '';
         inputEl.focus();
+        // Re-check for latin characters after clearing
+        validateHanziTypingInput(modCard);
     }
     
     // Clear result indicator
     const result = $('[data-role="hanziTypingResult"]', modCard);
     if (result) {
         result.classList.remove('good', 'bad');
+    }
+}
+
+/**
+ * Check if input contains latin characters and show reminder/disable check button
+ */
+function validateHanziTypingInput(modCard) {
+    const inputEl = $('[data-input="hanziTyping"]', modCard);
+    const checkBtn = $('#btnCheckHanziTyping', modCard) || $('[data-action="checkHanziTyping"]', modCard);
+    const hintEl = $('#hanziTypingHint', modCard);
+    
+    if (!inputEl) return;
+    
+    const value = inputEl.value;
+    // Check for latin characters (a-z, A-Z)
+    const hasLatinChars = /[a-zA-Z]/.test(value);
+    
+    if (hasLatinChars) {
+        // Show polite reminder
+        if (hintEl) {
+            hintEl.textContent = 'This field is for typing Hanzi characters. Please use a Pinyin keyboard to input Hanzi.';
+            hintEl.style.display = 'block';
+        }
+        // Disable check button
+        if (checkBtn) {
+            checkBtn.disabled = true;
+        }
+    } else {
+        // Hide reminder
+        if (hintEl) {
+            hintEl.style.display = 'none';
+        }
+        // Enable check button
+        if (checkBtn) {
+            checkBtn.disabled = false;
+        }
     }
 }
 
@@ -740,8 +788,22 @@ export function bindModality(modCard) {
                 checkPinyin(modCard);
             } else if (input.matches('[data-input="hanziTyping"]')) {
                 e.preventDefault();
-                checkHanziTyping(modCard);
+                // Only allow check if no latin characters
+                const checkBtn = $('#btnCheckHanziTyping', modCard) || $('[data-action="checkHanziTyping"]', modCard);
+                if (checkBtn && !checkBtn.disabled) {
+                    checkHanziTyping(modCard);
+                }
             }
         }
     });
+    
+    // Add input validation for Hanzi Typing
+    if (modCard.id === 'modHanziTyping') {
+        const inputEl = $('[data-input="hanziTyping"]', modCard);
+        if (inputEl) {
+            inputEl.addEventListener('input', () => validateHanziTypingInput(modCard));
+            // Initial validation
+            validateHanziTypingInput(modCard);
+        }
+    }
 }

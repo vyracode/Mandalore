@@ -88,8 +88,9 @@
                                         <input class="field" inputmode="text" type="text" enterkeyhint="go"
                                             autocapitalize="none" autocorrect="off" placeholder="type hanzi" 
                                             data-input="hanziTyping" aria-label="Hanzi input" lang="zh" />
-                                        <button class="btn" data-action="checkHanziTyping" type="button">Check</button>
+                                        <button class="btn" data-action="checkHanziTyping" id="btnCheckHanziTyping" type="button">Check</button>
                                     </div>
+                                    <div class="hint-text" id="hanziTypingHint" style="display: none; margin-top: 8px; font-size: 12px; color: rgba(255,255,255,.6);"></div>
                                     <div class="checked-row mod-checked">
                                         <div class="checked-result" data-role="hanziTypingResult">
                                             <span class="r-dot" aria-hidden="true"></span>
@@ -311,8 +312,12 @@
                                     <div class="label">Import wordlist</div>
                                     <div class="hint">Paste JSON array of {word,pinyin,definition}</div>
                                 </div>
-                                <button class="btn ghost" id="btnCopyPrompt" type="button"
-                                    style="font-size:12px; padding: 4px 10px;">Copy ChatGPT Prompt</button>
+                                <div style="display:flex; align-items:center; gap:8px;">
+                                    <div class="pill" title="Word count"><span
+                                            aria-hidden="true">📚</span><small>Words</small><span id="wordCount">0</span></div>
+                                    <button class="btn ghost" id="btnCopyPrompt" type="button"
+                                        style="font-size:12px; padding: 4px 10px;">Copy ChatGPT Prompt</button>
+                                </div>
                             </div>
 
                             <textarea id="wordlistJson" class="textarea-small mono" inputmode="text" enterkeyhint="done"

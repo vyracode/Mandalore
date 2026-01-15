@@ -227,7 +227,8 @@ function applyImportedDeck(data) {
     // Start fresh
     nextCard();
     
-    // Update FSRS stats if settings tab is active
+    // Update word count and FSRS stats if settings tab is active
+    renderWordCount();
     if (state.tab === 'settings') {
         renderFSRSStats();
     }
@@ -263,6 +264,9 @@ export function handleForgetList() {
 
     const dn = $('#deckName');
     if (dn) dn.textContent = 'Empty Wordlist';
+
+    // Update word count
+    renderWordCount();
 
     // Refresh card (will show empty state)
     nextCard();
@@ -508,6 +512,13 @@ export function renderSentenceCount() {
     const countEl = $('#sentenceCount');
     if (countEl) {
         countEl.textContent = state.cachedSentences.length.toString();
+    }
+}
+
+export function renderWordCount() {
+    const countEl = $('#wordCount');
+    if (countEl) {
+        countEl.textContent = (state.wordlist?.length || 0).toString();
     }
 }
 

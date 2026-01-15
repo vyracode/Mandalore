@@ -1,8 +1,9 @@
 /**
  * FSRS-6 Spaced Repetition Module
  * 
- * Manages FSRS card scheduling for flashcard practice.
- * Each word+front combination is tracked as a separate FSRS card.
+ * Manages FSRS subcard scheduling for flashcard practice.
+ * Supercards (what user sees) = [Word][FrontMode]
+ * Subcards (stored in FSRS) = [Word][FrontMode][BackMode] pairs
  */
 
 // Import FSRS library (exposed as global FSRS from ts-fsrs.js)
@@ -11,13 +12,25 @@
 const FRONT_TYPES = ['hanzi', 'pronunciation', 'meaning'];
 
 /**
- * Get FSRS card key for a word+front combination
+ * Get back modes for a given front mode
+ * @param {string} front - The front modality type
+ * @returns {Array<string>} - Array of back mode types
+ */
+export function getBackModesForFront(front) {
+    // All fronts have the same back modes (the other 3 modalities)
+    // Excluding the front itself
+    return FRONT_TYPES.filter(f => f !== front);
+}
+
+/**
+ * Get FSRS subcard key for a word+front+back combination
  * @param {string} wordId - The word's unique ID
  * @param {string} front - The front modality type
- * @returns {string} - Unique key for this card
+ * @param {string} backMode - The back modality type
+ * @returns {string} - Unique key for this subcard
  */
-export function getCardKey(wordId, front) {
-    return `${wordId}_${front}`;
+export function getSubcardKey(wordId, front, backMode) {
+    return `${wordId}_${front}_${backMode}`;
 }
 
 /**
@@ -59,18 +72,19 @@ export function createEmptyCard(due = null) {
 }
 
 /**
- * Get or create FSRS card for a word+front combination
+ * Get or create FSRS subcard for a word+front+back combination
  * @param {string} wordId - The word's unique ID
  * @param {string} front - The front modality type
- * @param {Object} fsrsCards - Map of existing FSRS cards
- * @returns {Object} - FSRS card object
+ * @param {string} backMode - The back modality type
+ * @param {Object} fsrsSubcards - Map of existing FSRS subcards
+ * @returns {Object} - FSRS subcard object
  */
-export function getOrCreateCard(wordId, front, fsrsCards) {
-    const key = getCardKey(wordId, front);
+export function getOrCreateSubcard(wordId, front, backMode, fsrsSubcards) {
+    const key = getSubcardKey(wordId, front, backMode);
     
-    if (fsrsCards && fsrsCards[key]) {
-        // Return existing card, ensuring dates are Date objects
-        const card = fsrsCards[key];
+    if (fsrsSubcards && fsrsSubcards[key]) {
+        // Return existing subcard, ensuring dates are Date objects
+        const card = fsrsSubcards[key];
         return {
             ...card,
             due: card.due ? new Date(card.due) : new Date(),
@@ -78,7 +92,7 @@ export function getOrCreateCard(wordId, front, fsrsCards) {
         };
     }
     
-    // Create new card
+    // Create new subcard
     return createEmptyCard();
 }
 
@@ -126,19 +140,20 @@ export function recordReview(card, now = new Date(), rating) {
 }
 
 /**
- * Get the next card to review based on FSRS scheduling
+ * Get the next supercard to review based on FSRS scheduling
+ * Supercard dueness = most due subcard's dueness
  * @param {Array} wordlist - List of words
- * @param {Object} fsrsCards - Map of FSRS cards
+ * @param {Object} fsrsSubcards - Map of FSRS subcards
  * @param {string} lastWordId - Last word ID shown (to avoid showing same word twice in a row)
- * @returns {Object|null} - { word, front, card } or null if no cards due
+ * @returns {Object|null} - { word, front } or null if no cards due
  */
-export function getNextCard(wordlist, fsrsCards, lastWordId = '') {
+export function getNextSupercard(wordlist, fsrsSubcards, lastWordId = '') {
     if (!wordlist || wordlist.length === 0) return null;
     
     const now = new Date();
-    const dueCards = [];
+    const supercards = []; // Array of { word, front, mostDueSubcard, mostDueDate, priority }
     
-    // Collect all cards that are due or overdue
+    // Group subcards by supercard and find most due subcard for each
     for (const word of wordlist) {
         const wordId = word.id;
         if (!wordId) continue;
@@ -147,55 +162,106 @@ export function getNextCard(wordlist, fsrsCards, lastWordId = '') {
         if (lastWordId && wordId === lastWordId) continue;
         
         for (const front of FRONT_TYPES) {
-            const card = getOrCreateCard(wordId, front, fsrsCards);
-            if (!card) continue;
+            const backModes = getBackModesForFront(front);
+            let mostDueSubcard = null;
+            let mostDueDate = null;
+            let mostDuePriority = Infinity;
+            let hasAnyDue = false;
             
-            const dueDate = card.due ? new Date(card.due) : new Date(0);
-            const isDue = dueDate <= now;
+            // Check all subcards for this supercard
+            for (const backMode of backModes) {
+                const subcard = getOrCreateSubcard(wordId, front, backMode, fsrsSubcards);
+                if (!subcard) continue;
+                
+                const dueDate = subcard.due ? new Date(subcard.due) : new Date(0);
+                const isDue = dueDate <= now;
+                
+                if (isDue || !subcard.last_review) {
+                    hasAnyDue = true;
+                    const priority = isDue ? (now - dueDate) : Infinity;
+                    
+                    // Track most due subcard
+                    if (priority < mostDuePriority || (priority === Infinity && mostDuePriority === Infinity && (!mostDueDate || dueDate < mostDueDate))) {
+                        mostDueSubcard = subcard;
+                        mostDueDate = dueDate;
+                        mostDuePriority = priority;
+                    }
+                } else {
+                    // Not due yet, but check if it's earlier than current most due
+                    if (!mostDueDate || dueDate < mostDueDate) {
+                        mostDueDate = dueDate;
+                        mostDuePriority = Infinity;
+                    }
+                }
+            }
             
-            if (isDue || !card.last_review) {
-                // Card is due or never reviewed
-                dueCards.push({
+            // Add supercard if it has any subcards (due or upcoming)
+            if (hasAnyDue || mostDueDate) {
+                supercards.push({
                     word,
                     front,
-                    card,
-                    dueDate,
-                    priority: isDue ? (now - dueDate) : Infinity // Earlier due = higher priority
+                    mostDueSubcard,
+                    mostDueDate: mostDueDate || new Date(),
+                    priority: mostDuePriority
                 });
             }
         }
     }
     
-    // If no cards available after filtering, allow the same word (fallback)
-    if (dueCards.length === 0 && lastWordId) {
+    // If no supercards available after filtering, allow the same word (fallback)
+    if (supercards.length === 0 && lastWordId) {
         // Re-collect without filtering
         for (const word of wordlist) {
             const wordId = word.id;
             if (!wordId) continue;
             
             for (const front of FRONT_TYPES) {
-                const card = getOrCreateCard(wordId, front, fsrsCards);
-                if (!card) continue;
+                const backModes = getBackModesForFront(front);
+                let mostDueSubcard = null;
+                let mostDueDate = null;
+                let mostDuePriority = Infinity;
+                let hasAnyDue = false;
                 
-                const dueDate = card.due ? new Date(card.due) : new Date(0);
-                const isDue = dueDate <= now;
+                for (const backMode of backModes) {
+                    const subcard = getOrCreateSubcard(wordId, front, backMode, fsrsSubcards);
+                    if (!subcard) continue;
+                    
+                    const dueDate = subcard.due ? new Date(subcard.due) : new Date(0);
+                    const isDue = dueDate <= now;
+                    
+                    if (isDue || !subcard.last_review) {
+                        hasAnyDue = true;
+                        const priority = isDue ? (now - dueDate) : Infinity;
+                        
+                        if (priority < mostDuePriority || (priority === Infinity && mostDuePriority === Infinity && (!mostDueDate || dueDate < mostDueDate))) {
+                            mostDueSubcard = subcard;
+                            mostDueDate = dueDate;
+                            mostDuePriority = priority;
+                        }
+                    } else {
+                        if (!mostDueDate || dueDate < mostDueDate) {
+                            mostDueDate = dueDate;
+                            mostDuePriority = Infinity;
+                        }
+                    }
+                }
                 
-                if (isDue || !card.last_review) {
-                    dueCards.push({
+                if (hasAnyDue || mostDueDate) {
+                    supercards.push({
                         word,
                         front,
-                        card,
-                        dueDate,
-                        priority: isDue ? (now - dueDate) : Infinity
+                        mostDueSubcard,
+                        mostDueDate: mostDueDate || new Date(),
+                        priority: mostDuePriority
                     });
                 }
             }
         }
     }
     
-    if (dueCards.length === 0) {
-        // No cards due, return earliest upcoming card (excluding last word if possible)
-        const upcomingCards = [];
+    if (supercards.length === 0) {
+        // No supercards due, return earliest upcoming supercard (excluding last word if possible)
+        const upcomingSupercards = [];
         for (const word of wordlist) {
             const wordId = word.id;
             if (!wordId) continue;
@@ -204,65 +270,82 @@ export function getNextCard(wordlist, fsrsCards, lastWordId = '') {
             if (lastWordId && wordId === lastWordId) continue;
             
             for (const front of FRONT_TYPES) {
-                const card = getOrCreateCard(wordId, front, fsrsCards);
-                if (!card) continue;
+                const backModes = getBackModesForFront(front);
+                let earliestDueDate = null;
                 
-                const dueDate = card.due ? new Date(card.due) : new Date();
-                upcomingCards.push({
-                    word,
-                    front,
-                    card,
-                    dueDate
-                });
-            }
-        }
-        
-        // If no upcoming cards after filtering, allow the same word (fallback)
-        if (upcomingCards.length === 0 && lastWordId) {
-            for (const word of wordlist) {
-                const wordId = word.id;
-                if (!wordId) continue;
-                
-                for (const front of FRONT_TYPES) {
-                    const card = getOrCreateCard(wordId, front, fsrsCards);
-                    if (!card) continue;
+                for (const backMode of backModes) {
+                    const subcard = getOrCreateSubcard(wordId, front, backMode, fsrsSubcards);
+                    if (!subcard) continue;
                     
-                    const dueDate = card.due ? new Date(card.due) : new Date();
-                    upcomingCards.push({
+                    const dueDate = subcard.due ? new Date(subcard.due) : new Date();
+                    if (!earliestDueDate || dueDate < earliestDueDate) {
+                        earliestDueDate = dueDate;
+                    }
+                }
+                
+                if (earliestDueDate) {
+                    upcomingSupercards.push({
                         word,
                         front,
-                        card,
-                        dueDate
+                        mostDueDate: earliestDueDate
                     });
                 }
             }
         }
         
-        if (upcomingCards.length === 0) return null;
+        // If no upcoming supercards after filtering, allow the same word (fallback)
+        if (upcomingSupercards.length === 0 && lastWordId) {
+            for (const word of wordlist) {
+                const wordId = word.id;
+                if (!wordId) continue;
+                
+                for (const front of FRONT_TYPES) {
+                    const backModes = getBackModesForFront(front);
+                    let earliestDueDate = null;
+                    
+                    for (const backMode of backModes) {
+                        const subcard = getOrCreateSubcard(wordId, front, backMode, fsrsSubcards);
+                        if (!subcard) continue;
+                        
+                        const dueDate = subcard.due ? new Date(subcard.due) : new Date();
+                        if (!earliestDueDate || dueDate < earliestDueDate) {
+                            earliestDueDate = dueDate;
+                        }
+                    }
+                    
+                    if (earliestDueDate) {
+                        upcomingSupercards.push({
+                            word,
+                            front,
+                            mostDueDate: earliestDueDate
+                        });
+                    }
+                }
+            }
+        }
+        
+        if (upcomingSupercards.length === 0) return null;
         
         // Sort by due date and return earliest
-        upcomingCards.sort((a, b) => a.dueDate - b.dueDate);
-        const next = upcomingCards[0];
+        upcomingSupercards.sort((a, b) => a.mostDueDate - b.mostDueDate);
+        const next = upcomingSupercards[0];
         return {
             word: next.word,
-            front: next.front,
-            card: next.card
+            front: next.front
         };
     }
     
     // Sort by priority (most overdue first)
-    dueCards.sort((a, b) => a.priority - b.priority);
+    supercards.sort((a, b) => a.priority - b.priority);
     
-    // Randomly select from top 20% most overdue cards (or top 3, whichever is larger)
-    // This adds some variety while prioritizing overdue cards
-    const topCount = Math.max(3, Math.ceil(dueCards.length * 0.2));
-    const topCards = dueCards.slice(0, topCount);
-    const selected = topCards[Math.floor(Math.random() * topCards.length)];
+    // Randomly select from top 20% most overdue supercards (or top 3, whichever is larger)
+    const topCount = Math.max(3, Math.ceil(supercards.length * 0.2));
+    const topSupercards = supercards.slice(0, topCount);
+    const selected = topSupercards[Math.floor(Math.random() * topSupercards.length)];
     
     return {
         word: selected.word,
-        front: selected.front,
-        card: selected.card
+        front: selected.front
     };
 }
 

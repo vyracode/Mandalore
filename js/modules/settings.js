@@ -3,7 +3,7 @@ import { $, $$ } from './utils.js';
 import { nextCard } from './flashcards.js';
 import { prompts } from './prompts.js';
 import { generateWordId } from './wordId.js';
-import { getCardKey, getOrCreateCard } from './fsrs.js';
+import { getSubcardKey, getOrCreateSubcard, getBackModesForFront } from './fsrs.js';
 
 function autoResizeTextarea(textarea) {
     if (!textarea) return;
@@ -523,17 +523,26 @@ export function renderWordCount() {
 }
 
 /**
- * Calculate FSRS statistics
+ * Calculate FSRS statistics (both supercards and subcards)
  */
 function calculateFSRSStats() {
     const FRONT_TYPES = ['hanzi', 'pronunciation', 'meaning'];
     const now = new Date();
     const stats = {
-        totalCards: 0,
-        newCards: 0,
-        learningCards: 0,
-        reviewCards: 0,
-        relearningCards: 0,
+        // Supercard stats
+        totalSupercards: 0,
+        newSupercards: 0,
+        learningSupercards: 0,
+        reviewSupercards: 0,
+        relearningSupercards: 0,
+        dueNowSupercards: 0,
+        dueSoonSupercards: 0,
+        // Subcard stats
+        totalSubcards: 0,
+        newSubcards: 0,
+        learningSubcards: 0,
+        reviewSubcards: 0,
+        relearningSubcards: 0,
         dueNow: 0,
         dueSoon: 0, // Next 24 hours
         totalReviews: 0,
@@ -550,7 +559,7 @@ function calculateFSRSStats() {
     let totalStability = 0;
     let totalDifficulty = 0;
     let totalInterval = 0;
-    let cardsWithStats = 0;
+    let subcardsWithStats = 0;
     
     // FSRS State enum values (from ts-fsrs)
     const State = typeof FSRS !== 'undefined' ? FSRS.State : {
@@ -560,66 +569,118 @@ function calculateFSRSStats() {
         Relearning: 3
     };
     
+    // Track supercards for aggregation
+    const supercardMap = new Map(); // wordId_front -> { subcards: [], states: Set, dueDates: [] }
+    
     for (const word of state.wordlist) {
         const wordId = word.id || generateWordId(word.word, word.pinyinToned);
         
         for (const front of FRONT_TYPES) {
-            stats.totalCards++;
+            stats.totalSupercards++;
+            const supercardKey = `${wordId}_${front}`;
+            const supercardData = {
+                subcards: [],
+                states: new Set(),
+                dueDates: [],
+                hasDue: false,
+                hasDueSoon: false
+            };
             
-            const cardKey = getCardKey(wordId, front);
-            const card = state.fsrsCards[cardKey];
+            const backModes = getBackModesForFront(front);
             
-            if (!card) {
-                stats.newCards++;
-                continue;
-            }
-            
-            // Count by state
-            const cardState = card.state !== undefined ? card.state : State.New;
-            if (cardState === State.New) stats.newCards++;
-            else if (cardState === State.Learning) stats.learningCards++;
-            else if (cardState === State.Review) stats.reviewCards++;
-            else if (cardState === State.Relearning) stats.relearningCards++;
-            
-            // Count due cards
-            if (card.due) {
-                const dueDate = new Date(card.due);
-                const hoursUntilDue = (dueDate - now) / (1000 * 60 * 60);
+            for (const backMode of backModes) {
+                stats.totalSubcards++;
                 
-                if (dueDate <= now) {
-                    stats.dueNow++;
-                } else if (hoursUntilDue <= 24) {
-                    stats.dueSoon++;
+                const subcardKey = getSubcardKey(wordId, front, backMode);
+                const subcard = state.fsrsSubcards[subcardKey];
+                
+                supercardData.subcards.push(subcard);
+                
+                if (!subcard) {
+                    stats.newSubcards++;
+                    supercardData.states.add(State.New);
+                    supercardData.hasDue = true; // New = due
+                    continue;
                 }
-            } else {
-                // No due date means it's new/never reviewed
-                stats.dueNow++;
+                
+                // Count subcard by state
+                const subcardState = subcard.state !== undefined ? subcard.state : State.New;
+                supercardData.states.add(subcardState);
+                
+                if (subcardState === State.New) stats.newSubcards++;
+                else if (subcardState === State.Learning) stats.learningSubcards++;
+                else if (subcardState === State.Review) stats.reviewSubcards++;
+                else if (subcardState === State.Relearning) stats.relearningSubcards++;
+                
+                // Count due subcards
+                if (subcard.due) {
+                    const dueDate = new Date(subcard.due);
+                    supercardData.dueDates.push(dueDate);
+                    const hoursUntilDue = (dueDate - now) / (1000 * 60 * 60);
+                    
+                    if (dueDate <= now) {
+                        stats.dueNow++;
+                        supercardData.hasDue = true;
+                    } else if (hoursUntilDue <= 24) {
+                        stats.dueSoon++;
+                        supercardData.hasDueSoon = true;
+                    }
+                } else {
+                    // No due date means it's new/never reviewed
+                    stats.dueNow++;
+                    supercardData.hasDue = true;
+                }
+                
+                // Accumulate stats
+                if (subcard.reps !== undefined) stats.totalReviews += subcard.reps;
+                if (subcard.lapses !== undefined) stats.totalLapses += subcard.lapses;
+                
+                if (subcard.stability !== undefined && subcard.stability > 0) {
+                    totalStability += subcard.stability;
+                    subcardsWithStats++;
+                }
+                
+                if (subcard.difficulty !== undefined && subcard.difficulty > 0) {
+                    totalDifficulty += subcard.difficulty;
+                }
+                
+                if (subcard.scheduled_days !== undefined && subcard.scheduled_days > 0) {
+                    totalInterval += subcard.scheduled_days;
+                }
             }
             
-            // Accumulate stats
-            if (card.reps !== undefined) stats.totalReviews += card.reps;
-            if (card.lapses !== undefined) stats.totalLapses += card.lapses;
-            
-            if (card.stability !== undefined && card.stability > 0) {
-                totalStability += card.stability;
-                cardsWithStats++;
+            // Determine supercard state (priority: Relearning > Learning > Review > New)
+            let supercardState = State.New;
+            if (supercardData.states.has(State.Relearning)) {
+                supercardState = State.Relearning;
+            } else if (supercardData.states.has(State.Learning)) {
+                supercardState = State.Learning;
+            } else if (supercardData.states.has(State.Review) && supercardData.states.size === 1) {
+                // All subcards are Review
+                supercardState = State.Review;
             }
             
-            if (card.difficulty !== undefined && card.difficulty > 0) {
-                totalDifficulty += card.difficulty;
-            }
+            // Count supercards by state
+            if (supercardState === State.New) stats.newSupercards++;
+            else if (supercardState === State.Learning) stats.learningSupercards++;
+            else if (supercardState === State.Review) stats.reviewSupercards++;
+            else if (supercardState === State.Relearning) stats.relearningSupercards++;
             
-            if (card.scheduled_days !== undefined && card.scheduled_days > 0) {
-                totalInterval += card.scheduled_days;
+            // Count due supercards
+            if (supercardData.hasDue) {
+                stats.dueNowSupercards++;
+            }
+            if (supercardData.hasDueSoon) {
+                stats.dueSoonSupercards++;
             }
         }
     }
     
     // Calculate averages
-    if (cardsWithStats > 0) {
-        stats.avgStability = totalStability / cardsWithStats;
-        stats.avgDifficulty = totalDifficulty / cardsWithStats;
-        stats.avgInterval = totalInterval / cardsWithStats;
+    if (subcardsWithStats > 0) {
+        stats.avgStability = totalStability / subcardsWithStats;
+        stats.avgDifficulty = totalDifficulty / subcardsWithStats;
+        stats.avgInterval = totalInterval / subcardsWithStats;
     }
     
     return stats;
@@ -650,10 +711,10 @@ export function renderFSRSStats() {
         return `${formatNumber(days / 365, 1)} years`;
     };
     
-    if (stats.totalCards === 0) {
+    if (stats.totalSubcards === 0) {
         container.innerHTML = `
             <div style="text-align: center; padding: 20px; color: rgba(255,255,255,.5);">
-                No cards yet. Import a wordlist to start tracking FSRS statistics.
+                No subcards yet. Import a wordlist to start tracking FSRS statistics.
             </div>
         `;
         return;
@@ -662,31 +723,58 @@ export function renderFSRSStats() {
     container.innerHTML = `
         <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin-bottom: 16px;">
             <div style="background: rgba(255,255,255,.04); border-radius: 8px; padding: 12px;">
-                <div style="font-size: 11px; color: rgba(255,255,255,.5); margin-bottom: 4px;">Total Cards</div>
-                <div style="font-size: 20px; font-weight: 700;">${stats.totalCards}</div>
+                <div style="font-size: 11px; color: rgba(255,255,255,.5); margin-bottom: 4px;">Total Supercards</div>
+                <div style="font-size: 20px; font-weight: 700;">${stats.totalSupercards}</div>
             </div>
             <div style="background: rgba(255,255,255,.04); border-radius: 8px; padding: 12px;">
-                <div style="font-size: 11px; color: rgba(255,255,255,.5); margin-bottom: 4px;">Due Now</div>
+                <div style="font-size: 11px; color: rgba(255,255,255,.5); margin-bottom: 4px;">Total Subcards</div>
+                <div style="font-size: 20px; font-weight: 700;">${stats.totalSubcards}</div>
+            </div>
+        </div>
+        
+        <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin-bottom: 16px;">
+            <div style="background: rgba(255,255,255,.04); border-radius: 8px; padding: 12px;">
+                <div style="font-size: 11px; color: rgba(255,255,255,.5); margin-bottom: 4px;">Due Now (Supercards)</div>
+                <div style="font-size: 20px; font-weight: 700; color: var(--orange);">${stats.dueNowSupercards}</div>
+            </div>
+            <div style="background: rgba(255,255,255,.04); border-radius: 8px; padding: 12px;">
+                <div style="font-size: 11px; color: rgba(255,255,255,.5); margin-bottom: 4px;">Due Now (Subcards)</div>
                 <div style="font-size: 20px; font-weight: 700; color: var(--orange);">${stats.dueNow}</div>
             </div>
         </div>
         
         <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin-bottom: 16px;">
             <div>
-                <div style="font-size: 11px; color: rgba(255,255,255,.5); margin-bottom: 4px;">New</div>
-                <div style="font-size: 16px; font-weight: 650;">${stats.newCards}</div>
+                <div style="font-size: 11px; color: rgba(255,255,255,.5); margin-bottom: 4px;">New (Supercards)</div>
+                <div style="font-size: 16px; font-weight: 650;">${stats.newSupercards}</div>
             </div>
             <div>
-                <div style="font-size: 11px; color: rgba(255,255,255,.5); margin-bottom: 4px;">Learning</div>
-                <div style="font-size: 16px; font-weight: 650; color: var(--cyan);">${stats.learningCards}</div>
+                <div style="font-size: 11px; color: rgba(255,255,255,.5); margin-bottom: 4px;">New (Subcards)</div>
+                <div style="font-size: 16px; font-weight: 650;">${stats.newSubcards}</div>
             </div>
             <div>
-                <div style="font-size: 11px; color: rgba(255,255,255,.5); margin-bottom: 4px;">Review</div>
-                <div style="font-size: 16px; font-weight: 650; color: var(--green);">${stats.reviewCards}</div>
+                <div style="font-size: 11px; color: rgba(255,255,255,.5); margin-bottom: 4px;">Learning (Supercards)</div>
+                <div style="font-size: 16px; font-weight: 650; color: var(--cyan);">${stats.learningSupercards}</div>
             </div>
             <div>
-                <div style="font-size: 11px; color: rgba(255,255,255,.5); margin-bottom: 4px;">Relearning</div>
-                <div style="font-size: 16px; font-weight: 650; color: var(--purple);">${stats.relearningCards}</div>
+                <div style="font-size: 11px; color: rgba(255,255,255,.5); margin-bottom: 4px;">Learning (Subcards)</div>
+                <div style="font-size: 16px; font-weight: 650; color: var(--cyan);">${stats.learningSubcards}</div>
+            </div>
+            <div>
+                <div style="font-size: 11px; color: rgba(255,255,255,.5); margin-bottom: 4px;">Review (Supercards)</div>
+                <div style="font-size: 16px; font-weight: 650; color: var(--green);">${stats.reviewSupercards}</div>
+            </div>
+            <div>
+                <div style="font-size: 11px; color: rgba(255,255,255,.5); margin-bottom: 4px;">Review (Subcards)</div>
+                <div style="font-size: 16px; font-weight: 650; color: var(--green);">${stats.reviewSubcards}</div>
+            </div>
+            <div>
+                <div style="font-size: 11px; color: rgba(255,255,255,.5); margin-bottom: 4px;">Relearning (Supercards)</div>
+                <div style="font-size: 16px; font-weight: 650; color: var(--purple);">${stats.relearningSupercards}</div>
+            </div>
+            <div>
+                <div style="font-size: 11px; color: rgba(255,255,255,.5); margin-bottom: 4px;">Relearning (Subcards)</div>
+                <div style="font-size: 16px; font-weight: 650; color: var(--purple);">${stats.relearningSubcards}</div>
             </div>
         </div>
         
@@ -775,4 +863,12 @@ export function forgetSentences() {
     if (modal && modal.style.display !== 'none') {
         viewSentences();
     }
+}
+
+export function forgetFSRS() {
+    if (!confirm('Forget all FSRS-6 learning data? This will reset all spaced repetition progress.')) return;
+    
+    state.fsrsSubcards = {};
+    saveState();
+    renderFSRSStats();
 }

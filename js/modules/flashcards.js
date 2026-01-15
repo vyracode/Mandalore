@@ -2,7 +2,7 @@ import { state, bumpSession, saveState } from '../state.js';
 import { $, $$ } from './utils.js';
 import getCandidates from '../lib/pinyin-ime.esm.js';
 import { generateWordId } from './wordId.js';
-import { getCardKey, getOrCreateCard, getNextCard, recordReview } from './fsrs.js';
+import { getSubcardKey, getOrCreateSubcard, getNextSupercard, recordReview, getBackModesForFront } from './fsrs.js';
 
 const FRONT_ORDER = ['hanzi', 'pronunciation', 'meaning'];
 const FRONT_LABEL = { hanzi: 'Hanzi', pronunciation: 'Audio', pinyin: 'Pinyin', meaning: 'Meaning' };
@@ -167,7 +167,7 @@ function generateHanziChoices(targetWord, targetPinyin, count = 5) {
 }
 
 export function nextCard() {
-    // Record review for previous card if it exists
+    // Record review for previous supercard if it exists
     if (state.card.word && state.card.id) {
         recordCardReview();
     }
@@ -185,8 +185,8 @@ export function nextCard() {
         return;
     }
 
-    // Use FSRS to get the next card to review (excluding last word shown)
-    const next = getNextCard(state.wordlist, state.fsrsCards, state.lastWordId);
+    // Use FSRS to get the next supercard to review (excluding last word shown)
+    const next = getNextSupercard(state.wordlist, state.fsrsSubcards, state.lastWordId);
     
     if (!next) {
         // Fallback to random if FSRS fails (avoiding last word if possible)
@@ -214,7 +214,7 @@ export function nextCard() {
         state.card.front = front;
         state.lastWordId = state.card.id;
     } else {
-        // Use FSRS-selected card
+        // Use FSRS-selected supercard
         const item = next.word;
         const front = next.front;
         
@@ -226,10 +226,6 @@ export function nextCard() {
         state.card.meaning = item.meaning;
         state.card.front = front;
         state.lastWordId = state.card.id; // Track this word as the last shown
-        
-        // Store the FSRS card for this word+front combination
-        const cardKey = getCardKey(state.card.id, front);
-        state.fsrsCards[cardKey] = next.card;
     }
 
     renderFront();
@@ -376,53 +372,108 @@ function resetModality(modCard) {
 }
 
 /**
- * Record FSRS review for the current card based on performance
+ * Record FSRS review for the current supercard based on performance
+ * Grades each subcard (front-back pair) individually
  */
 function recordCardReview() {
     if (!state.card.word || !state.card.id || !state.card.front) return;
     
-    // Determine overall performance
-    // Good (Right) if all graded modalities passed
-    // Again (Wrong) if any graded modality failed
-    let allGradedPassed = true;
-    const gradedKeys = Object.keys(cardPerformance.gradedModalities);
+    const wordId = state.card.id;
+    const front = state.card.front;
+    const backModes = getBackModesForFront(front); // e.g., ['pronunciation', 'pinyin', 'meaning']
     
-    if (gradedKeys.length === 0) {
-        // No graded modalities completed, don't record review
-        // (User might have skipped the card without answering)
-        return;
+    // Determine which back modes were tested and their results
+    const subcardResults = {};
+    
+    // Check if HanziTyping was used (combined mode)
+    const hanziTypingResult = cardPerformance.gradedModalities['hanziTyping'];
+    const hasHanziTyping = hanziTypingResult !== undefined;
+    
+    // Handle HanziTyping combined mode first (affects both hanzi and pinyin subcards)
+    if (hasHanziTyping && !inputsSeparated && backModes.includes('hanzi') && backModes.includes('pinyin')) {
+        // HanziTyping combined mode - tests both hanzi and pinyin together
+        subcardResults['hanzi'] = hanziTypingResult;
+        subcardResults['pinyin'] = hanziTypingResult;
     }
     
-    // Check if all graded modalities passed
-    for (const modality of gradedKeys) {
-        if (cardPerformance.gradedModalities[modality] !== true) {
-            allGradedPassed = false;
-            break;
+    // Map performance tracking to subcards
+    for (const backMode of backModes) {
+        // Skip if already handled by HanziTyping combined mode
+        if (hasHanziTyping && !inputsSeparated && (backMode === 'hanzi' || backMode === 'pinyin')) {
+            continue;
+        }
+        
+        if (backMode === 'hanzi') {
+            if (inputsSeparated) {
+                // HanziTyping separated - hanzi tested independently
+                const hanziResult = cardPerformance.gradedModalities['hanzi'];
+                if (hanziResult !== undefined) {
+                    subcardResults['hanzi'] = hanziResult;
+                }
+            } else {
+                // Regular hanzi multiple choice (not part of HanziTyping)
+                const hanziResult = cardPerformance.gradedModalities['hanzi'];
+                if (hanziResult !== undefined) {
+                    subcardResults['hanzi'] = hanziResult;
+                }
+            }
+        } else if (backMode === 'pinyin') {
+            if (inputsSeparated) {
+                // HanziTyping separated - pinyin tested independently
+                const pinyinResult = cardPerformance.gradedModalities['pinyin'];
+                if (pinyinResult !== undefined) {
+                    subcardResults['pinyin'] = pinyinResult;
+                }
+            } else {
+                // Regular pinyin (not part of HanziTyping)
+                const pinyinResult = cardPerformance.gradedModalities['pinyin'];
+                if (pinyinResult !== undefined) {
+                    subcardResults['pinyin'] = pinyinResult;
+                }
+            }
+        } else if (backMode === 'pronunciation') {
+            // Pronunciation requires BOTH tone and speech to pass
+            const toneResult = cardPerformance.gradedModalities['tone'];
+            const speechResult = cardPerformance.selfGradedModalities['speech'];
+            if (toneResult !== undefined && speechResult !== undefined) {
+                subcardResults['pronunciation'] = (toneResult === true && speechResult === true);
+            }
+        } else if (backMode === 'meaning') {
+            // Meaning is self-graded
+            const meaningResult = cardPerformance.selfGradedModalities['meaning'];
+            if (meaningResult !== undefined) {
+                subcardResults['meaning'] = meaningResult;
+            }
         }
     }
     
-    // Get or create FSRS card
-    const cardKey = getCardKey(state.card.id, state.card.front);
-    let fsrsCard = getOrCreateCard(state.card.id, state.card.front, state.fsrsCards);
-    
-    if (!fsrsCard) {
-        // FSRS library might not be loaded, skip recording
-        console.warn('FSRS card creation failed, skipping review recording');
+    // If no subcards were tested, don't record review
+    if (Object.keys(subcardResults).length === 0) {
         return;
     }
     
-    // Record review: 3 = Good (Right), 1 = Again (Wrong)
-    const rating = allGradedPassed ? 3 : 1;
-    const result = recordReview(fsrsCard, new Date(), rating);
-    
-    if (result && result.card) {
-        // Update stored card
-        state.fsrsCards[cardKey] = result.card;
-        saveState();
-        // Note: FSRS stats will update when user switches to settings tab
-    } else {
-        console.warn('FSRS review recording failed');
+    // Record review for each subcard individually
+    const now = new Date();
+    for (const [backMode, passed] of Object.entries(subcardResults)) {
+        const subcardKey = getSubcardKey(wordId, front, backMode);
+        let subcard = getOrCreateSubcard(wordId, front, backMode, state.fsrsSubcards);
+        
+        if (!subcard) {
+            console.warn(`FSRS subcard creation failed for ${subcardKey}, skipping review recording`);
+            continue;
+        }
+        
+        const rating = passed ? 3 : 1; // Good = 3, Again = 1
+        const result = recordReview(subcard, now, rating);
+        
+        if (result && result.card) {
+            state.fsrsSubcards[subcardKey] = result.card;
+        } else {
+            console.warn(`FSRS review recording failed for ${subcardKey}`);
+        }
     }
+    
+    saveState();
     
     // Reset performance tracking
     cardPerformance = {

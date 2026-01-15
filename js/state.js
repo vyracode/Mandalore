@@ -30,7 +30,7 @@ export const state = {
     apiKey: '',
     geminiModel: 'gemini-2.0-flash',
     cachedSentences: [], // [ { promptEN, promptZH, feedbackOverview, tokens } ]
-    fsrsCards: {}, // Map of cardKey -> FSRS card data: { wordId_front -> card }
+    fsrsSubcards: {}, // Map of subcardKey -> FSRS subcard data: { wordId_front_backMode -> card }
     lastWordId: '' // Track last word ID shown to avoid showing same word twice in a row
 };
 
@@ -38,10 +38,10 @@ const STORAGE_KEY = 'mandalore_state_v1';
 
 export function saveState() {
     try {
-        // Serialize FSRS cards (convert Date objects to ISO strings)
-        const serializedFsrsCards = {};
-        for (const [key, card] of Object.entries(state.fsrsCards)) {
-            serializedFsrsCards[key] = {
+        // Serialize FSRS subcards (convert Date objects to ISO strings)
+        const serializedFsrsSubcards = {};
+        for (const [key, card] of Object.entries(state.fsrsSubcards)) {
+            serializedFsrsSubcards[key] = {
                 ...card,
                 due: card.due ? card.due.toISOString() : null,
                 last_review: card.last_review ? card.last_review.toISOString() : null
@@ -54,7 +54,7 @@ export function saveState() {
             apiKey: state.apiKey,
             geminiModel: state.geminiModel,
             cachedSentences: state.cachedSentences,
-            fsrsCards: serializedFsrsCards
+            fsrsSubcards: serializedFsrsSubcards
         };
         localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
     } catch (e) {
@@ -77,18 +77,19 @@ export function loadState() {
         if (data.geminiModel) state.geminiModel = data.geminiModel;
         if (Array.isArray(data.cachedSentences)) state.cachedSentences = data.cachedSentences;
         
-        // Deserialize FSRS cards (convert ISO strings to Date objects)
-        if (data.fsrsCards && typeof data.fsrsCards === 'object') {
-            state.fsrsCards = {};
-            for (const [key, card] of Object.entries(data.fsrsCards)) {
-                state.fsrsCards[key] = {
+        // Deserialize FSRS subcards (convert ISO strings to Date objects)
+        // Start fresh - ignore old fsrsCards if present
+        if (data.fsrsSubcards && typeof data.fsrsSubcards === 'object') {
+            state.fsrsSubcards = {};
+            for (const [key, card] of Object.entries(data.fsrsSubcards)) {
+                state.fsrsSubcards[key] = {
                     ...card,
                     due: card.due ? new Date(card.due) : new Date(),
                     last_review: card.last_review ? new Date(card.last_review) : undefined
                 };
             }
         } else {
-            state.fsrsCards = {};
+            state.fsrsSubcards = {};
         }
         
         return true;

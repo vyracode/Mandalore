@@ -31,8 +31,8 @@
                             <div class="front-top">
                                 <div class="badge" id="frontBadge"><span class="dot" aria-hidden="true"></span><span
                                         id="frontLabel">Hanzi</span></div>
-                                <button class="btn primary btn-next-header" id="btnFabNext" type="button" aria-label="Next card">
-                                    Next <span aria-hidden="true">→</span>
+                                <button class="btn primary btn-next-header" id="btnFabNext" type="button" aria-label="Skip card">
+                                    Skip <span aria-hidden="true">→</span>
                                 </button>
                             </div>
 
@@ -56,6 +56,10 @@
                                             aria-hidden="true"></span> Meaning</div>
                                     <div class="mod-actions">
                                         <button class="btn mod-input" data-action="checkMeaning" type="button">Check</button>
+                                        <div class="checked-result mod-finished-result" data-role="meaningHeaderResult">
+                                            <span class="r-dot" aria-hidden="true"></span>
+                                            <span data-role="meaningHeaderMsg"></span>
+                                        </div>
                                     </div>
                                 </div>
                                 <div class="mod-body mod-checked">
@@ -71,6 +75,9 @@
                                         <span data-role="meaningMsg"></span>
                                     </div>
                                 </div>
+                                <div class="mod-finished" data-role="meaningFinished">
+                                    <div class="finished-answer" data-role="meaningFinishedAnswer"></div>
+                                </div>
                             </div>
 
                             <!-- Hanzi Typing (combined Hanzi + Pinyin test) -->
@@ -81,6 +88,10 @@
                                             aria-hidden="true"></span> Hanzi Typing</div>
                                     <div class="mod-actions">
                                         <button class="btn ghost btn-separate" data-action="separateInputs" type="button">Separate</button>
+                                        <div class="checked-result mod-finished-result" data-role="hanziTypingHeaderResult">
+                                            <span class="r-dot" aria-hidden="true"></span>
+                                            <span data-role="hanziTypingHeaderMsg"></span>
+                                        </div>
                                     </div>
                                 </div>
                                 <div class="mod-body">
@@ -99,6 +110,9 @@
                                         <div class="checked-answer" data-role="hanziTypingAnswer"></div>
                                         <button class="btn" data-action="coverHanziTyping" data-role="hanziTypingCover" type="button">Cover</button>
                                     </div>
+                                    <div class="mod-finished" data-role="hanziTypingFinished">
+                                        <div class="finished-answer" data-role="hanziTypingFinishedAnswer"></div>
+                                    </div>
                                 </div>
                             </div>
 
@@ -109,7 +123,7 @@
                                             style="background: var(--cyan); box-shadow: 0 0 0 3px rgba(40,216,255,.14)"
                                             aria-hidden="true"></span> Hanzi</div>
                                     <div class="mod-actions">
-                                        <div class="checked-result compact" data-role="hanziResult">
+                                        <div class="checked-result compact mod-finished-result" data-role="hanziResult">
                                             <span class="r-dot" aria-hidden="true"></span>
                                             <span data-role="hanziMsg"></span>
                                         </div>
@@ -124,6 +138,9 @@
                                         <button class="choice" data-choice type="button">欢迎吧</button>
                                         <button class="choice" data-choice type="button">欢影</button>
                                     </div>
+                                    <div class="mod-finished" data-role="hanziFinished">
+                                        <div class="finished-answer" data-role="hanziFinishedAnswer"></div>
+                                    </div>
                                 </div>
                             </div>
 
@@ -133,7 +150,12 @@
                                     <div class="chip"><span class="mini"
                                             style="background: var(--purple); box-shadow: 0 0 0 3px rgba(122,92,255,.14)"
                                             aria-hidden="true"></span> Spelling</div>
-                                    <div class="mod-actions"></div>
+                                    <div class="mod-actions">
+                                        <div class="checked-result mod-finished-result" data-role="pinyinHeaderResult">
+                                            <span class="r-dot" aria-hidden="true"></span>
+                                            <span data-role="pinyinHeaderMsg"></span>
+                                        </div>
+                                    </div>
                                 </div>
                                 <div class="mod-body">
                                     <div class="row mod-input">
@@ -151,6 +173,9 @@
                                         <div class="checked-answer" data-role="pinyinAnswer"></div>
                                         <button class="btn" data-action="coverPinyin" data-role="pinyinCover" type="button">Cover</button>
                                     </div>
+                                    <div class="mod-finished" data-role="pinyinFinished">
+                                        <div class="finished-answer" data-role="pinyinFinishedAnswer"></div>
+                                    </div>
                                 </div>
                             </div>
 
@@ -163,6 +188,13 @@
 
                                 <div class="mod-body pron">
                                     <div class="pron-block pron-tone" data-pron-state="input">
+                                        <div class="pron-head">
+                                            <div class="pron-label">Tones</div>
+                                            <div class="checked-result pron-finished-result" data-role="toneHeaderResult">
+                                                <span class="r-dot" aria-hidden="true"></span>
+                                                <span data-role="toneHeaderMsg"></span>
+                                            </div>
+                                        </div>
                                         <div class="row mod-input" style="justify-content:space-between">
                                             <input class="field" inputmode="numeric" type="tel" enterkeyhint="go"
                                                 pattern="[0-9]*" autocorrect="off" placeholder="tone numbers" 
@@ -176,11 +208,21 @@
                                             </div>
                                             <div class="checked-answer" data-role="toneAnswer"></div>
                                         </div>
+                                        <div class="mod-finished" data-role="toneFinished">
+                                            <div class="finished-answer" data-role="toneFinishedAnswer"></div>
+                                        </div>
                                     </div>
 
                                     <div class="pron-divider" aria-hidden="true"></div>
 
                                     <div class="pron-block pron-speak" data-pron-state="input">
+                                        <div class="pron-head">
+                                            <div class="pron-label">Speaking</div>
+                                            <div class="checked-result pron-finished-result" data-role="speechHeaderResult">
+                                                <span class="r-dot" aria-hidden="true"></span>
+                                                <span data-role="speechHeaderMsg"></span>
+                                            </div>
+                                        </div>
                                         <div class="row mod-input" style="justify-content:space-between">
                                             <div class="chip" style="background: rgba(0,0,0,.12)"><span class="mini"
                                                     style="background: var(--cyan); box-shadow: 0 0 0 3px rgba(40,216,255,.14)"
@@ -198,11 +240,18 @@
                                             <span class="r-dot" aria-hidden="true"></span>
                                             <span data-role="speechMsg"></span>
                                         </div>
+                                        <div class="mod-finished" data-role="speechFinished"></div>
                                     </div>
                                 </div>
                             </div>
 
                         </div>
+
+                        <!-- Next button (appears when all modalities are finished) -->
+                        <button class="btn primary btn-next-bottom" id="btnNextBottom" type="button" style="display: none;">
+                            Next <span aria-hidden="true">→</span>
+                        </button>
+
                     </div>
                 </div>
 

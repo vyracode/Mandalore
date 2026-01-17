@@ -17,6 +17,23 @@ let cardPerformance = {
     selfGradedModalities: {} // modality -> ok (true/false/undefined)
 };
 
+// Track which subcards have been recorded to avoid double-recording
+let recordedSubcards = new Set(); // Set of subcard keys (wordId_front_backMode)
+
+// Track if write-cover tests have been completed correctly (first correct answer)
+let writeCoverCompleted = {
+    pinyin: false,
+    hanziTyping: false
+};
+
+// Track user's first answer for finished state display
+let firstAnswers = {
+    pinyin: null,
+    hanziTyping: null,
+    hanzi: null,
+    tone: null
+};
+
 // FlashCardo audio mappings: wordId -> audioNum
 let flashCardoMappings = null;
 
@@ -167,13 +184,31 @@ function generateHanziChoices(targetWord, targetPinyin, count = 5) {
 }
 
 export function nextCard() {
-    // Record review for previous supercard if it exists
-    if (state.card.word && state.card.id) {
-        recordCardReview();
-    }
-    
     // Reset separated state for new card
     inputsSeparated = false;
+    
+    // Reset recorded subcards tracking for new card
+    recordedSubcards.clear();
+    
+    // Reset performance tracking for new card
+    cardPerformance = {
+        gradedModalities: {},
+        selfGradedModalities: {}
+    };
+    
+    // Reset write-cover completion tracking
+    writeCoverCompleted = {
+        pinyin: false,
+        hanziTyping: false
+    };
+    
+    // Reset first answers tracking
+    firstAnswers = {
+        pinyin: null,
+        hanziTyping: null,
+        hanzi: null,
+        tone: null
+    };
     
     if (!state.wordlist || state.wordlist.length === 0) {
         // Empty state
@@ -332,12 +367,15 @@ function resetModality(modCard) {
     
     // Clear result indicators
     $$('.checked-result', modCard).forEach(r => { 
-        r.classList.remove('good', 'bad'); 
+        r.classList.remove('good', 'bad', 'retries'); 
     });
     
     // Clear answer content
     $$('.checked-answer', modCard).forEach(a => { a.innerHTML = ''; });
     $$('.checked-audio', modCard).forEach(a => { a.innerHTML = ''; });
+    
+    // Clear finished state containers
+    $$('.finished-answer', modCard).forEach(a => { a.innerHTML = ''; });
     
     // Re-enable grade buttons
     $$('.btn-grade', modCard).forEach(btn => { btn.disabled = false; });
@@ -362,18 +400,62 @@ function resetModality(modCard) {
         });
     }
     
-    // Reset validation state
+    // Reset validation state (disable check buttons when inputs are empty)
     if (modCard.id === 'modHanziTyping') {
         validateHanziTypingInput(modCard);
     }
     if (modCard.id === 'modPinyin') {
         validatePinyinInput(modCard);
     }
+    if (modCard.id === 'modPronunciation') {
+        validateToneInput(modCard);
+    }
+}
+
+/**
+ * Record a single subcard review immediately
+ * @param {string} backMode - The back mode (hanzi, pinyin, pronunciation, meaning)
+ * @param {boolean} passed - Whether the user passed this subcard
+ */
+function recordSubcardReview(backMode, passed) {
+    if (!state.card.word || !state.card.id || !state.card.front) return;
+    
+    const wordId = state.card.id;
+    const front = state.card.front;
+    const subcardKey = getSubcardKey(wordId, front, backMode);
+    
+    // Avoid double-recording
+    if (recordedSubcards.has(subcardKey)) {
+        return;
+    }
+    
+    // Get or create subcard
+    let subcard = getOrCreateSubcard(wordId, front, backMode, state.fsrsSubcards);
+    
+    if (!subcard) {
+        console.warn(`FSRS subcard creation failed for ${subcardKey}, skipping review recording`);
+        return;
+    }
+    
+    // Record review
+    const now = new Date();
+    const rating = passed ? 3 : 1; // Good = 3, Again = 1
+    const result = recordReview(subcard, now, rating);
+    
+    if (result && result.card) {
+        state.fsrsSubcards[subcardKey] = result.card;
+        recordedSubcards.add(subcardKey);
+        saveState();
+    } else {
+        console.warn(`FSRS review recording failed for ${subcardKey}`);
+    }
 }
 
 /**
  * Record FSRS review for the current supercard based on performance
  * Grades each subcard (front-back pair) individually
+ * NOTE: This function is kept for backward compatibility but is no longer called
+ * Reviews are now recorded immediately when each modality is completed
  */
 function recordCardReview() {
     if (!state.card.word || !state.card.id || !state.card.front) return;
@@ -483,6 +565,12 @@ function recordCardReview() {
 }
 
 export function resetAllBack() {
+    // Hide the bottom Next button (shown again when all modalities are finished)
+    const btnNextBottom = $('#btnNextBottom');
+    if (btnNextBottom) {
+        btnNextBottom.style.display = 'none';
+    }
+    
     // Map front types to mod-card selectors
     const frontToMod = {
         'pronunciation': '#modPron',
@@ -541,6 +629,155 @@ function showResult(modCard, ok, msg, role) {
     if (textEl) textEl.textContent = msg;
 }
 
+/**
+ * Show the finished state for a modality
+ * @param {HTMLElement} modCard - The modality card element
+ * @param {string} modality - The modality name (pinyin, hanziTyping, hanzi, meaning, tone, speech)
+ * @param {boolean} ok - Whether the answer was correct
+ * @param {string} userAnswer - The user's answer (null if correct, shown only when wrong)
+ * @param {string} correctAnswer - The correct answer
+ * @param {boolean} isPronBlock - Whether this is a pronunciation block (uses data-pron-state)
+ * @param {boolean} retriesNeeded - Whether retries were needed to get correct (for write-cover modes)
+ */
+function showFinishedState(modCard, modality, ok, userAnswer, correctAnswer, isPronBlock = false, retriesNeeded = false) {
+    if (!modCard) return;
+    
+    // Set the finished state
+    if (isPronBlock) {
+        modCard.dataset.pronState = 'finished';
+    } else {
+        modCard.dataset.state = 'finished';
+    }
+    
+    // Find header result indicator (Correct/Incorrect/Retries goes in header, same line as label)
+    const headerResult = $(`[data-role="${modality}HeaderResult"]`, modCard);
+    const headerMsg = $(`[data-role="${modality}HeaderMsg"]`, modCard);
+    
+    // For hanzi, the header result uses different naming (hanziResult/hanziMsg)
+    const hanziHeaderResult = modality === 'hanzi' ? $(`[data-role="hanziResult"]`, modCard) : null;
+    const hanziHeaderMsg = modality === 'hanzi' ? $(`[data-role="hanziMsg"]`, modCard) : null;
+    
+    // Set header result indicator
+    const resultEl = headerResult || hanziHeaderResult;
+    const msgEl = headerMsg || hanziHeaderMsg;
+    
+    // Determine result class and message
+    // For write-cover modes: ok means finished (always correct eventually)
+    // retriesNeeded distinguishes first-try correct vs correct after retries
+    let resultClass, resultMsg;
+    if (ok) {
+        if (retriesNeeded) {
+            resultClass = 'retries';
+            resultMsg = 'Correct after retries';
+        } else {
+            resultClass = 'good';
+            resultMsg = 'Correct';
+        }
+    } else {
+        resultClass = 'bad';
+        resultMsg = 'Incorrect';
+    }
+    
+    if (resultEl) {
+        resultEl.classList.remove('good', 'bad', 'retries');
+        resultEl.classList.add(resultClass);
+    }
+    if (msgEl) {
+        msgEl.textContent = resultMsg;
+    }
+    
+    // Find finished answer container in body
+    const finishedAnswer = $(`[data-role="${modality}FinishedAnswer"]`, modCard);
+    
+    // Build answer content
+    if (finishedAnswer) {
+        let html = '';
+        
+        if (ok && !retriesNeeded) {
+            // Correct on first try: just show "Answer:"
+            html += `<div class="finished-line correct-answer">
+                <span class="label">Answer:</span>
+                <span class="value">${escapeHtml(correctAnswer)}</span>
+            </div>`;
+        } else {
+            // Incorrect OR correct after retries: show "Your Answer:" and "Correct Answer:"
+            if (userAnswer !== null && userAnswer !== undefined) {
+                html += `<div class="finished-line user-answer">
+                    <span class="label">Your Answer:</span>
+                    <span class="value">${escapeHtml(userAnswer)}</span>
+                </div>`;
+            }
+            html += `<div class="finished-line correct-answer">
+                <span class="label">Correct Answer:</span>
+                <span class="value">${escapeHtml(correctAnswer)}</span>
+            </div>`;
+        }
+        
+        finishedAnswer.innerHTML = html;
+    }
+    
+    // Check if all modalities are now finished
+    checkAllFinished();
+}
+
+/**
+ * Check if all visible modalities are in the "finished" state
+ * If so, show the bottom Next button
+ */
+function checkAllFinished() {
+    const btnNextBottom = $('#btnNextBottom');
+    if (!btnNextBottom) return;
+    
+    // Get all visible modality cards
+    const allMods = ['#modPron', '#modPinyin', '#modHanzi', '#modMeaning', '#modHanziTyping'];
+    let allFinished = true;
+    let visibleCount = 0;
+    
+    for (const sel of allMods) {
+        const modCard = $(sel);
+        if (!modCard) continue;
+        
+        // Skip hidden cards
+        if (modCard.style.display === 'none') continue;
+        
+        visibleCount++;
+        
+        // Check if this card is in finished state
+        if (sel === '#modPron') {
+            // Pronunciation has two blocks - both must be finished
+            const toneBlock = $('.pron-tone', modCard);
+            const speakBlock = $('.pron-speak', modCard);
+            const toneFinished = toneBlock && toneBlock.dataset.pronState === 'finished';
+            const speakFinished = speakBlock && speakBlock.dataset.pronState === 'finished';
+            if (!toneFinished || !speakFinished) {
+                allFinished = false;
+                break;
+            }
+        } else {
+            if (modCard.dataset.state !== 'finished') {
+                allFinished = false;
+                break;
+            }
+        }
+    }
+    
+    // Show/hide the bottom Next button
+    if (allFinished && visibleCount > 0) {
+        btnNextBottom.style.display = '';
+    } else {
+        btnNextBottom.style.display = 'none';
+    }
+}
+
+/**
+ * Escape HTML special characters
+ */
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
 function wireSoundButtons(scope = document) {
     scope.querySelectorAll('.sound').forEach((btn) => {
         if (!(btn instanceof HTMLElement)) return;
@@ -562,24 +799,36 @@ function wireSoundButtons(scope = document) {
 // Pronunciation: Tone
 function checkTone(modCard) {
     const inputEl = $('[data-input="tone"]', modCard);
-    const ans = $('[data-role="toneAnswer"]', modCard);
     const toneBlock = $('.pron-tone', modCard);
-    if (!inputEl || !ans || !toneBlock) return;
+    if (!inputEl || !toneBlock) return;
 
     const input = inputEl.value.trim().replace(/\\s+/g, '');
     const correct = state.card.tones || '';
     const ok = (input === correct);
     
-    // Switch to checked state
-    toneBlock.dataset.pronState = 'checked';
+    // Store first answer for display
+    if (firstAnswers.tone === null) {
+        firstAnswers.tone = input;
+    }
     
     // Track performance for FSRS
     cardPerformance.gradedModalities['tone'] = ok;
     
-    showResult(modCard, ok, ok ? 'Right' : 'Wrong', 'tone');
+    // Check if pronunciation subcard can be recorded (needs both tone and speech)
+    const front = state.card.front;
+    const backModes = getBackModesForFront(front);
+    if (backModes.includes('pronunciation')) {
+        const speechResult = cardPerformance.selfGradedModalities['speech'];
+        if (speechResult !== undefined) {
+            // Both tone and speech are complete, record pronunciation subcard
+            const pronunciationPassed = (ok === true && speechResult === true);
+            recordSubcardReview('pronunciation', pronunciationPassed);
+        }
+    }
+    
+    // Immediately show finished state for tone (no cover option)
+    showFinishedState(toneBlock, 'tone', ok, ok ? null : input, correct, true);
     bumpSession(ok ? 1 : 0);
-
-    ans.innerHTML = `<strong>Tones:</strong> ${correct}`;
 }
 
 // Pronunciation: Speak
@@ -615,23 +864,45 @@ function checkPinyin(modCard) {
     const correct = state.card.pinyinBare || '';
     const ok = (input === correct);
     
-    // Switch to checked state
-    modCard.dataset.state = 'checked';
+    // Store first answer for finished state display
+    if (firstAnswers.pinyin === null) {
+        firstAnswers.pinyin = input;
+    }
     
     // Track performance for FSRS (only record initial attempt)
     if (cardPerformance.gradedModalities['pinyin'] === undefined) {
         cardPerformance.gradedModalities['pinyin'] = ok;
+        
+        // Record immediately if this is a pinyin subcard
+        const front = state.card.front;
+        const backModes = getBackModesForFront(front);
+        if (backModes.includes('pinyin')) {
+            // Check if we're in separated mode (pinyin tested independently)
+            // or regular pinyin mode (not part of HanziTyping)
+            if (inputsSeparated || !backModes.includes('hanzi')) {
+                recordSubcardReview('pinyin', ok);
+            }
+        }
     }
     
-    showResult(modCard, ok, ok ? 'Right' : 'Wrong', 'pinyin');
-    
-    if (ok) {
-        // Right: hide input, show answer (normal behavior)
-        modCard.classList.add('is-correct');
-        ans.innerHTML = `<strong>Answer:</strong> ${correct}`;
+    if (ok && !writeCoverCompleted.pinyin) {
+        // First correct answer - show finished state
+        writeCoverCompleted.pinyin = true;
+        const retriesNeeded = cardPerformance.gradedModalities['pinyin'] === false;
+        const displayUserAnswer = retriesNeeded ? firstAnswers.pinyin : null;
+        // For write-cover, ok is always true when finished (they got it right eventually)
+        // retriesNeeded indicates if they needed retries
+        showFinishedState(modCard, 'pinyin', true, displayUserAnswer, correct, false, retriesNeeded);
         bumpSession(1);
+    } else if (ok && writeCoverCompleted.pinyin) {
+        // Already finished, just stay in finished state
+        modCard.dataset.state = 'finished';
     } else {
-        // Wrong: keep input visible but disabled, show answer for comparison
+        // Wrong: show checked state with cover option
+        modCard.dataset.state = 'checked';
+        showResult(modCard, ok, ok ? 'Correct' : 'Incorrect', 'pinyin');
+        
+        // Keep input visible but disabled, show answer for comparison
         if (inputRow) {
             inputRow.style.display = 'flex';
         }
@@ -649,6 +920,11 @@ function checkPinyin(modCard) {
 
 // Cover the answer and allow retry (Look, Cover, Write, Check, Repeat)
 function coverPinyin(modCard) {
+    // If already finished, don't allow cover
+    if (writeCoverCompleted.pinyin) {
+        return;
+    }
+    
     const inputEl = $('[data-input="pinyin"]', modCard);
     const inputRow = $('.mod-input', modCard);
     const checkBtn = $('#btnCheckPinyin', modCard) || $('[data-action="checkPinyin"]', modCard);
@@ -693,13 +969,14 @@ function pickHanzi(modCard, btn) {
     const all = $$('[data-choice]', modCard);
     const correctText = state.card.word;
     const correctBtn = all.find(b => b.textContent.trim() === correctText) || null;
+    const userAnswer = btn.textContent.trim();
 
     all.forEach(b => {
         b.dataset.picked = 'false';
         delete b.dataset.grade;
     });
 
-    const ok = (btn.textContent.trim() === correctText);
+    const ok = (userAnswer === correctText);
     btn.dataset.picked = 'true';
 
     if (ok) {
@@ -709,13 +986,30 @@ function pickHanzi(modCard, btn) {
         if (correctBtn) correctBtn.dataset.grade = 'correct';
     }
 
-    // Switch to checked state (shows result in header)
-    modCard.dataset.state = 'checked';
+    // Store first answer
+    if (firstAnswers.hanzi === null) {
+        firstAnswers.hanzi = userAnswer;
+    }
     
     // Track performance for FSRS
     cardPerformance.gradedModalities['hanzi'] = ok;
     
-    showResult(modCard, ok, ok ? 'Right' : 'Wrong', 'hanzi');
+    // Record immediately if this is a hanzi subcard
+    const front = state.card.front;
+    const backModes = getBackModesForFront(front);
+    if (backModes.includes('hanzi')) {
+        // Check if we're in separated mode (hanzi tested independently)
+        // or regular hanzi mode (not part of HanziTyping)
+        if (inputsSeparated || !backModes.includes('pinyin')) {
+            recordSubcardReview('hanzi', ok);
+        }
+    }
+    
+    // Show result in header (compact)
+    showResult(modCard, ok, ok ? 'Correct' : 'Incorrect', 'hanzi');
+    
+    // Show finished state (multiple choice finishes immediately)
+    showFinishedState(modCard, 'hanzi', ok, ok ? null : userAnswer, correctText);
     bumpSession(ok ? 1 : 0);
 }
 
@@ -743,14 +1037,34 @@ function selfGrade(modCard, ok, role) {
     // Track performance for FSRS (self-graded modalities)
     cardPerformance.selfGradedModalities[role] = ok;
     
-    showResult(modCard, ok, ok ? 'Right' : 'Wrong', role);
-    bumpSession(ok ? 1 : 0);
+    // Record immediately based on role
+    const front = state.card.front;
+    const backModes = getBackModesForFront(front);
     
-    // Disable grade buttons after selection
-    const selfContainer = $(`[data-role="${role}Self"]`, modCard);
-    if (selfContainer) {
-        $$('.btn-grade', selfContainer).forEach(btn => { btn.disabled = true; });
+    if (role === 'meaning' && backModes.includes('meaning')) {
+        // Meaning subcard - record immediately
+        recordSubcardReview('meaning', ok);
+        
+        // Show finished state for meaning
+        const correctAnswer = state.card.meaning || '';
+        showFinishedState(modCard, 'meaning', ok, null, correctAnswer);
+    } else if (role === 'speech' && backModes.includes('pronunciation')) {
+        // Speech is part of pronunciation - check if tone is also done
+        const toneResult = cardPerformance.gradedModalities['tone'];
+        if (toneResult !== undefined) {
+            // Both tone and speech are complete, record pronunciation subcard
+            const pronunciationPassed = (toneResult === true && ok === true);
+            recordSubcardReview('pronunciation', pronunciationPassed);
+        }
+        
+        // Show finished state for speech (no audio button, just result)
+        const speakBlock = $('.pron-speak', modCard);
+        if (speakBlock) {
+            showFinishedState(speakBlock, 'speech', ok, null, 'Self-graded', true);
+        }
     }
+    
+    bumpSession(ok ? 1 : 0);
 }
 
 // Hanzi Typing: combined Hanzi + Pinyin test
@@ -761,30 +1075,57 @@ function checkHanziTyping(modCard) {
 
     const input = inputEl.value.trim();
     const correct = state.card.word || '';
+    const correctDisplay = `${correct} (${state.card.pinyinBare || ''})`;
     const ok = (input === correct);
     
-    // Switch to checked state
-    modCard.dataset.state = 'checked';
+    // Store first answer for finished state display
+    if (firstAnswers.hanziTyping === null) {
+        firstAnswers.hanziTyping = input;
+    }
     
     // Track performance for FSRS (only record initial attempt)
     // hanziTyping tests both hanzi and pinyin
     if (cardPerformance.gradedModalities['hanziTyping'] === undefined) {
         cardPerformance.gradedModalities['hanziTyping'] = ok;
+        
+        // Record immediately if in combined mode (tests both hanzi and pinyin together)
+        const front = state.card.front;
+        const backModes = getBackModesForFront(front);
+        if (!inputsSeparated && backModes.includes('hanzi') && backModes.includes('pinyin')) {
+            // Combined mode - record both subcards with same result
+            recordSubcardReview('hanzi', ok);
+            recordSubcardReview('pinyin', ok);
+        }
     }
     
-    showResult(modCard, ok, ok ? 'Right' : 'Wrong', 'hanziTyping');
-    ans.innerHTML = `<strong>Answer:</strong> ${correct} <span style="color: rgba(255,255,255,.5); margin-left: 8px">(${state.card.pinyinBare || ''})</span>`;
-    
-    if (ok) {
-        modCard.classList.add('is-correct');
+    if (ok && !writeCoverCompleted.hanziTyping) {
+        // First correct answer - show finished state
+        writeCoverCompleted.hanziTyping = true;
+        const retriesNeeded = cardPerformance.gradedModalities['hanziTyping'] === false;
+        const displayUserAnswer = retriesNeeded ? firstAnswers.hanziTyping : null;
+        // For write-cover, ok is always true when finished (they got it right eventually)
+        // retriesNeeded indicates if they needed retries
+        showFinishedState(modCard, 'hanziTyping', true, displayUserAnswer, correctDisplay, false, retriesNeeded);
         // Hanzi Typing tests both Hanzi recognition and Pinyin spelling, so count as 2
         bumpSession(2);
+    } else if (ok && writeCoverCompleted.hanziTyping) {
+        // Already finished, just stay in finished state
+        modCard.dataset.state = 'finished';
+    } else {
+        // Wrong: show checked state with cover option
+        modCard.dataset.state = 'checked';
+        showResult(modCard, ok, ok ? 'Correct' : 'Incorrect', 'hanziTyping');
+        ans.innerHTML = `<strong>Answer:</strong> ${correct} <span style="color: rgba(255,255,255,.5); margin-left: 8px">(${state.card.pinyinBare || ''})</span>`;
     }
-    // If wrong, Cover button is visible and allows retry
 }
 
 // Cover the answer and allow retry for Hanzi Typing
 function coverHanziTyping(modCard) {
+    // If already finished, don't allow cover
+    if (writeCoverCompleted.hanziTyping) {
+        return;
+    }
+    
     const inputEl = $('[data-input="hanziTyping"]', modCard);
     
     // Switch back to input state
@@ -819,6 +1160,7 @@ function validateHanziTypingInput(modCard) {
     if (!inputEl) return;
     
     const value = inputEl.value;
+    const isEmpty = value.trim() === '';
     // Check for latin characters (a-z, A-Z)
     const hasLatinChars = /[a-zA-Z]/.test(value);
     
@@ -832,12 +1174,19 @@ function validateHanziTypingInput(modCard) {
         if (checkBtn) {
             checkBtn.disabled = true;
         }
-    } else {
-        // Hide reminder
+    } else if (isEmpty) {
+        // Hide reminder but disable check button
         if (hintEl) {
             hintEl.style.display = 'none';
         }
-        // Enable check button
+        if (checkBtn) {
+            checkBtn.disabled = true;
+        }
+    } else {
+        // Hide reminder and enable check button
+        if (hintEl) {
+            hintEl.style.display = 'none';
+        }
         if (checkBtn) {
             checkBtn.disabled = false;
         }
@@ -855,6 +1204,7 @@ function validatePinyinInput(modCard) {
     if (!inputEl) return;
     
     const value = inputEl.value;
+    const isEmpty = value.trim() === '';
     // Check for Hanzi characters (CJK Unified Ideographs)
     const hasHanzi = /[\u4e00-\u9fff]/.test(value);
     
@@ -868,15 +1218,39 @@ function validatePinyinInput(modCard) {
         if (checkBtn) {
             checkBtn.disabled = true;
         }
-    } else {
-        // Hide reminder
+    } else if (isEmpty) {
+        // Hide reminder but disable check button
         if (hintEl) {
             hintEl.style.display = 'none';
         }
-        // Enable check button
+        if (checkBtn) {
+            checkBtn.disabled = true;
+        }
+    } else {
+        // Hide reminder and enable check button
+        if (hintEl) {
+            hintEl.style.display = 'none';
+        }
         if (checkBtn) {
             checkBtn.disabled = false;
         }
+    }
+}
+
+/**
+ * Validate tone input - disable check button if empty
+ */
+function validateToneInput(modCard) {
+    const inputEl = $('[data-input="tone"]', modCard);
+    const checkBtn = $('[data-action="checkTone"]', modCard);
+    
+    if (!inputEl) return;
+    
+    const value = inputEl.value;
+    const isEmpty = value.trim() === '';
+    
+    if (checkBtn) {
+        checkBtn.disabled = isEmpty;
     }
 }
 
@@ -959,6 +1333,16 @@ export function bindModality(modCard) {
             inputEl.addEventListener('input', () => validatePinyinInput(modCard));
             // Initial validation
             validatePinyinInput(modCard);
+        }
+    }
+    
+    // Add input validation for Tone
+    if (modCard.id === 'modPronunciation') {
+        const inputEl = $('[data-input="tone"]', modCard);
+        if (inputEl) {
+            inputEl.addEventListener('input', () => validateToneInput(modCard));
+            // Initial validation
+            validateToneInput(modCard);
         }
     }
 }

@@ -10,7 +10,7 @@ function runSmokeTests() {
     const required = [
         '#tabFlash', '#tabTranslate', '#tabSettings',
         '#screen-flash', '#screen-translate', '#screen-settings',
-        '#btnFabNext',
+        '#btnFabNext', '#btnNextBottom',
         '#modPron', '#modPinyin', '#modHanzi', '#modMeaning', '#modHanziTyping',
         '#fbSentence', '#btnSubmitTranslation', '#btnSwitchDirection', '#btnSkipSentence', '#btnNextSentence',
         '#btnImport', '#btnForgetKey', '#btnForgetList', '#btnClearCache'
@@ -52,8 +52,9 @@ on('#tabFlash', 'click', () => setTab('flash'));
 on('#tabTranslate', 'click', () => setTab('translate'));
 on('#tabSettings', 'click', () => setTab('settings'));
 
-// Flash controls (Next doubles as Skip)
+// Flash controls (Skip button in header, Next button at bottom when all finished)
 on('#btnFabNext', 'click', () => { nextCard(); });
+on('#btnNextBottom', 'click', () => { nextCard(); });
 
 // Modality binds
 bindModality($('#modPron'));

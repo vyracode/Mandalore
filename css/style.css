@@ -154,13 +154,24 @@ nav {
     color: var(--muted);
 }
 
-/* Next button in front card header */
+/* Skip button in front card header */
 .btn-next-header {
     height: 28px;
     padding: 0 12px;
     border-radius: 14px;
     font-size: 12px;
     font-weight: 900;
+    flex-shrink: 0;
+}
+
+/* Next button at bottom of card stack (appears when all finished) */
+.btn-next-bottom {
+    width: 100%;
+    height: 48px;
+    border-radius: 16px;
+    font-size: 16px;
+    font-weight: 900;
+    margin-top: auto;
     flex-shrink: 0;
 }
 
@@ -618,6 +629,15 @@ nav {
     box-shadow: 0 0 0 2px rgba(255, 79, 216, .2);
 }
 
+.checked-result.retries {
+    border-color: rgba(255, 176, 32, .3);
+}
+
+.checked-result.retries .r-dot {
+    background: var(--orange);
+    box-shadow: 0 0 0 2px rgba(255, 176, 32, .2);
+}
+
 /* Compact result in header (for hanzi) */
 .checked-result.compact {
     display: none;
@@ -643,8 +663,10 @@ nav {
 
 .mod-card[data-state="checked"] > .mod-body > .checked-result.good,
 .mod-card[data-state="checked"] > .mod-body > .checked-result.bad,
+.mod-card[data-state="checked"] > .mod-body > .checked-result.retries,
 .pron-block[data-pron-state="checked"] > .checked-result.good,
-.pron-block[data-pron-state="checked"] > .checked-result.bad {
+.pron-block[data-pron-state="checked"] > .checked-result.bad,
+.pron-block[data-pron-state="checked"] > .checked-result.retries {
     display: flex;
 }
 
@@ -707,6 +729,147 @@ nav {
 .btn-grade:disabled {
     opacity: .4;
     cursor: not-allowed;
+}
+
+/* =====================================================
+   FINISHED STATE
+   Cards transition from checked -> finished when complete
+   ===================================================== */
+
+/* Hide finished content by default */
+.mod-finished {
+    display: none;
+}
+
+/* Hide input and checked content when finished */
+.mod-card[data-state="finished"] .mod-input,
+.mod-card[data-state="finished"] .mod-checked,
+.mod-card[data-state="finished"] .hint-text,
+.pron-block[data-pron-state="finished"] .mod-input,
+.pron-block[data-pron-state="finished"] .mod-checked {
+    display: none;
+}
+
+/* Show finished content when finished */
+.mod-card[data-state="finished"] .mod-finished,
+.pron-block[data-pron-state="finished"] .mod-finished {
+    display: block;
+}
+
+/* When mod-finished is empty (e.g., speech has no answer to show), don't display it */
+.mod-card[data-state="finished"] .mod-finished:empty,
+.pron-block[data-pron-state="finished"] .mod-finished:empty {
+    display: none;
+}
+
+/* Speech finished has no content to show - always hide it */
+.pron-block.pron-speak[data-pron-state="finished"] .mod-finished {
+    display: none;
+}
+
+/* Hide the checked-result that appears after self-grading when finished */
+.pron-block[data-pron-state="finished"] > .checked-result {
+    display: none;
+}
+
+/* Speaking block when finished should collapse to just the header */
+.pron-block.pron-speak[data-pron-state="finished"] {
+    gap: 0;
+}
+
+/* Show compact result in header when finished (for hanzi) */
+.mod-card[data-state="finished"] .checked-result.compact {
+    display: flex;
+}
+
+/* Hide choices when finished (for hanzi) */
+.mod-card[data-state="finished"] .choices {
+    display: none;
+}
+
+/* Header result indicators - hidden by default, shown when finished */
+.mod-finished-result {
+    display: none;
+}
+
+.mod-card[data-state="finished"] .mod-finished-result {
+    display: flex;
+}
+
+/* Hide buttons when finished */
+.mod-card[data-state="finished"] .btn-separate,
+.mod-card[data-state="finished"] .mod-actions .btn {
+    display: none;
+}
+
+/* Pronunciation block headers */
+.pron-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.pron-label {
+    font-family: "Google Sans", system-ui, -apple-system, sans-serif;
+    font-weight: 700;
+    font-size: 13px;
+    color: rgba(255, 255, 255, .7);
+}
+
+/* Pronunciation header result indicators - hidden by default */
+.pron-finished-result {
+    display: none;
+}
+
+.pron-block[data-pron-state="finished"] .pron-finished-result {
+    display: flex;
+}
+
+/* Finished answer container */
+.finished-answer {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+/* Empty finished answer (e.g., for self-graded speech) - don't show */
+.finished-answer:empty {
+    display: none;
+}
+
+/* Individual answer lines */
+.finished-line {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    font-size: 14px;
+    line-height: 1.4;
+    padding: 6px 10px;
+    background: rgba(0, 0, 0, .12);
+    border-radius: 8px;
+}
+
+.finished-line .label {
+    font-family: "Google Sans", system-ui, -apple-system, sans-serif;
+    font-weight: 600;
+    font-size: 12px;
+    color: rgba(255, 255, 255, .5);
+    flex-shrink: 0;
+    min-width: 95px;
+}
+
+.finished-line .value {
+    font-family: "Google Sans", system-ui, -apple-system, sans-serif;
+    font-weight: 850;
+    color: rgba(255, 255, 255, .9);
+}
+
+.finished-line.user-answer .value {
+    color: rgba(255, 79, 216, .9);
+}
+
+.finished-line.correct-answer .value {
+    color: rgba(42, 245, 154, .9);
 }
 
 /* Audio in checked state */

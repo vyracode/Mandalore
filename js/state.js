@@ -31,7 +31,9 @@ export const state = {
     geminiModel: 'gemini-2.0-flash',
     cachedSentences: [], // [ { promptEN, promptZH, feedbackOverview, tokens } ]
     fsrsSubcards: {}, // Map of subcardKey -> FSRS subcard data: { wordId_front_backMode -> card }
-    lastWordId: '' // Track last word ID shown to avoid showing same word twice in a row
+    lastWordId: '', // Track last word ID shown to avoid showing same word twice in a row
+    dailySupercardCount: 0, // Count of supercards completed today
+    dailySupercardDate: null // Date string (YYYY-MM-DD) for the day this count is for
 };
 
 const STORAGE_KEY = 'mandalore_state_v1';
@@ -54,7 +56,9 @@ export function saveState() {
             apiKey: state.apiKey,
             geminiModel: state.geminiModel,
             cachedSentences: state.cachedSentences,
-            fsrsSubcards: serializedFsrsSubcards
+            fsrsSubcards: serializedFsrsSubcards,
+            dailySupercardCount: state.dailySupercardCount,
+            dailySupercardDate: state.dailySupercardDate
         };
         localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
     } catch (e) {
@@ -92,6 +96,17 @@ export function loadState() {
             state.fsrsSubcards = {};
         }
         
+        // Load daily supercard count
+        if (typeof data.dailySupercardCount === 'number') {
+            state.dailySupercardCount = data.dailySupercardCount;
+        }
+        if (data.dailySupercardDate) {
+            state.dailySupercardDate = data.dailySupercardDate;
+        }
+        
+        // Reset counter if it's a new day
+        checkAndResetDailyCounter();
+        
         return true;
     } catch (e) {
         console.error('Failed to load state', e);
@@ -101,4 +116,41 @@ export function loadState() {
 
 export function bumpSession(n) {
     state.sessionCount = Math.max(0, state.sessionCount + n);
+}
+
+/**
+ * Get today's date string (YYYY-MM-DD)
+ */
+function getTodayDateString() {
+    const now = new Date();
+    return now.toISOString().split('T')[0];
+}
+
+/**
+ * Check if we need to reset the daily counter (new day)
+ */
+export function checkAndResetDailyCounter() {
+    const today = getTodayDateString();
+    if (state.dailySupercardDate !== today) {
+        state.dailySupercardCount = 0;
+        state.dailySupercardDate = today;
+        saveState();
+    }
+}
+
+/**
+ * Increment daily supercard counter
+ */
+export function incrementDailySupercardCount() {
+    checkAndResetDailyCounter();
+    state.dailySupercardCount++;
+    saveState();
+}
+
+/**
+ * Get current daily supercard count
+ */
+export function getDailySupercardCount() {
+    checkAndResetDailyCounter();
+    return state.dailySupercardCount;
 }

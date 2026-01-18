@@ -1,6 +1,6 @@
 import { state, loadState, saveState } from './state.js';
 import { $, on } from './modules/utils.js';
-import { renderFront, nextCard, resetAllBack, bindModality } from './modules/flashcards.js';
+import { renderFront, nextCard, resetAllBack, bindModality, updateDailySupercardCounter } from './modules/flashcards.js';
 import { setTranslationDir, checkTranslation, newSentence, showTranslateA, handleFeedbackClick, renderFeedbackTokens, skipSentence, switchTranslationDir } from './modules/translation.js';
 import { renderKeyStatus, handleImport, handleForgetList, forgetKey, saveKey, copyPrompt, renderModel, handleModelChange, triggerBrowse, handleFileSelect, clearCacheAndReload, loadVersionInfo, setupTextareaAutoResize, renderSentenceCount, renderWordCount, viewSentences, closeModal, forgetSentences, renderFSRSStats, forgetFSRS } from './modules/settings.js';
 
@@ -115,7 +115,8 @@ if (loadState()) {
 }
 
 setTab('flash');
-nextCard(); // Will render empty state if no words
+nextCard();
+updateDailySupercardCounter(); // Will render empty state if no words
 setTranslationDir('ENZH');
 renderKeyStatus();
 renderModel();

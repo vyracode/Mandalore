@@ -1,4 +1,4 @@
-import { state, bumpSession, saveState } from '../state.js';
+import { state, bumpSession, saveState, incrementDailySupercardCount, getDailySupercardCount } from '../state.js';
 import { $, $$ } from './utils.js';
 import getCandidates from '../lib/pinyin-ime.esm.js';
 import { generateWordId } from './wordId.js';
@@ -19,6 +19,9 @@ let cardPerformance = {
 
 // Track which subcards have been recorded to avoid double-recording
 let recordedSubcards = new Set(); // Set of subcard keys (wordId_front_backMode)
+
+// Track if we've already counted this supercard to avoid double-counting
+let currentSupercardCounted = false;
 
 // Track if write-cover tests have been completed correctly (first correct answer)
 let writeCoverCompleted = {
@@ -190,6 +193,9 @@ export function nextCard() {
     // Reset recorded subcards tracking for new card
     recordedSubcards.clear();
     
+    // Reset supercard counting flag for new card
+    currentSupercardCounted = false;
+    
     // Reset performance tracking for new card
     cardPerformance = {
         gradedModalities: {},
@@ -267,6 +273,29 @@ export function nextCard() {
     resetAllBack();
 }
 
+/**
+ * Calculate total number of supercards (words * 3 front types)
+ */
+function getTotalSupercards() {
+    if (!state.wordlist || state.wordlist.length === 0) {
+        return 0;
+    }
+    const FRONT_TYPES = ['hanzi', 'pronunciation', 'meaning'];
+    return state.wordlist.length * FRONT_TYPES.length;
+}
+
+/**
+ * Update the daily supercard counter display
+ */
+export function updateDailySupercardCounter() {
+    const counterEl = $('#dailySupercardCounter');
+    if (counterEl) {
+        const dailyCount = getDailySupercardCount();
+        const totalSupercards = getTotalSupercards();
+        counterEl.textContent = `${dailyCount}/${totalSupercards}`;
+    }
+}
+
 export function renderFront() {
     // Handle empty state
     if (!state.card.word) {
@@ -278,6 +307,7 @@ export function renderFront() {
         if (body) {
             body.innerHTML = '<div style="font-size:16px; color:rgba(255,255,255,0.7)">No words loaded.<br>Go to Settings to import a wordlist.</div>';
         }
+        updateDailySupercardCounter();
         return;
     }
 
@@ -340,6 +370,8 @@ export function renderFront() {
         const c = { hanzi: 'var(--cyan)', pronunciation: 'var(--green)', pinyin: 'var(--purple)', meaning: 'var(--orange)' }[f];
         dot.style.background = c;
     }
+    
+    updateDailySupercardCounter();
 }
 
 function resetModality(modCard) {
@@ -451,119 +483,6 @@ function recordSubcardReview(backMode, passed) {
     }
 }
 
-/**
- * Record FSRS review for the current supercard based on performance
- * Grades each subcard (front-back pair) individually
- * NOTE: This function is kept for backward compatibility but is no longer called
- * Reviews are now recorded immediately when each modality is completed
- */
-function recordCardReview() {
-    if (!state.card.word || !state.card.id || !state.card.front) return;
-    
-    const wordId = state.card.id;
-    const front = state.card.front;
-    const backModes = getBackModesForFront(front); // e.g., ['pronunciation', 'pinyin', 'meaning']
-    
-    // Determine which back modes were tested and their results
-    const subcardResults = {};
-    
-    // Check if HanziTyping was used (combined mode)
-    const hanziTypingResult = cardPerformance.gradedModalities['hanziTyping'];
-    const hasHanziTyping = hanziTypingResult !== undefined;
-    
-    // Handle HanziTyping combined mode first (affects both hanzi and pinyin subcards)
-    if (hasHanziTyping && !inputsSeparated && backModes.includes('hanzi') && backModes.includes('pinyin')) {
-        // HanziTyping combined mode - tests both hanzi and pinyin together
-        subcardResults['hanzi'] = hanziTypingResult;
-        subcardResults['pinyin'] = hanziTypingResult;
-    }
-    
-    // Map performance tracking to subcards
-    for (const backMode of backModes) {
-        // Skip if already handled by HanziTyping combined mode
-        if (hasHanziTyping && !inputsSeparated && (backMode === 'hanzi' || backMode === 'pinyin')) {
-            continue;
-        }
-        
-        if (backMode === 'hanzi') {
-            if (inputsSeparated) {
-                // HanziTyping separated - hanzi tested independently
-                const hanziResult = cardPerformance.gradedModalities['hanzi'];
-                if (hanziResult !== undefined) {
-                    subcardResults['hanzi'] = hanziResult;
-                }
-            } else {
-                // Regular hanzi multiple choice (not part of HanziTyping)
-                const hanziResult = cardPerformance.gradedModalities['hanzi'];
-                if (hanziResult !== undefined) {
-                    subcardResults['hanzi'] = hanziResult;
-                }
-            }
-        } else if (backMode === 'pinyin') {
-            if (inputsSeparated) {
-                // HanziTyping separated - pinyin tested independently
-                const pinyinResult = cardPerformance.gradedModalities['pinyin'];
-                if (pinyinResult !== undefined) {
-                    subcardResults['pinyin'] = pinyinResult;
-                }
-            } else {
-                // Regular pinyin (not part of HanziTyping)
-                const pinyinResult = cardPerformance.gradedModalities['pinyin'];
-                if (pinyinResult !== undefined) {
-                    subcardResults['pinyin'] = pinyinResult;
-                }
-            }
-        } else if (backMode === 'pronunciation') {
-            // Pronunciation requires BOTH tone and speech to pass
-            const toneResult = cardPerformance.gradedModalities['tone'];
-            const speechResult = cardPerformance.selfGradedModalities['speech'];
-            if (toneResult !== undefined && speechResult !== undefined) {
-                subcardResults['pronunciation'] = (toneResult === true && speechResult === true);
-            }
-        } else if (backMode === 'meaning') {
-            // Meaning is self-graded
-            const meaningResult = cardPerformance.selfGradedModalities['meaning'];
-            if (meaningResult !== undefined) {
-                subcardResults['meaning'] = meaningResult;
-            }
-        }
-    }
-    
-    // If no subcards were tested, don't record review
-    if (Object.keys(subcardResults).length === 0) {
-        return;
-    }
-    
-    // Record review for each subcard individually
-    const now = new Date();
-    for (const [backMode, passed] of Object.entries(subcardResults)) {
-        const subcardKey = getSubcardKey(wordId, front, backMode);
-        let subcard = getOrCreateSubcard(wordId, front, backMode, state.fsrsSubcards);
-        
-        if (!subcard) {
-            console.warn(`FSRS subcard creation failed for ${subcardKey}, skipping review recording`);
-            continue;
-        }
-        
-        const rating = passed ? 3 : 1; // Good = 3, Again = 1
-        const result = recordReview(subcard, now, rating);
-        
-        if (result && result.card) {
-            state.fsrsSubcards[subcardKey] = result.card;
-        } else {
-            console.warn(`FSRS review recording failed for ${subcardKey}`);
-        }
-    }
-    
-    saveState();
-    
-    // Reset performance tracking
-    cardPerformance = {
-        gradedModalities: {},
-        selfGradedModalities: {}
-    };
-}
-
 export function resetAllBack() {
     // Hide the bottom Next button (shown again when all modalities are finished)
     const btnNextBottom = $('#btnNextBottom');
@@ -611,13 +530,6 @@ export function resetAllBack() {
             resetModality(modCard);
         }
     });
-}
-
-export function cycleFront() {
-    // Legacy: used to just cycle. Now handled by nextCard randomly.
-    // But if we want to "reveal" we don't cycle front.
-    // The "NEXT" button should trigger nextCard().
-    nextCard();
 }
 
 function showResult(modCard, ok, msg, role) {
@@ -722,7 +634,7 @@ function showFinishedState(modCard, modality, ok, userAnswer, correctAnswer, isP
 
 /**
  * Check if all visible modalities are in the "finished" state
- * If so, show the bottom Next button
+ * If so, show the bottom Next button and increment daily counter
  */
 function checkAllFinished() {
     const btnNextBottom = $('#btnNextBottom');
@@ -763,7 +675,15 @@ function checkAllFinished() {
     
     // Show/hide the bottom Next button
     if (allFinished && visibleCount > 0) {
-        btnNextBottom.style.display = '';
+        btnNextBottom.style.display = 'flex';
+        
+        // Increment daily supercard counter when all modalities are finished
+        // Only count once per supercard (tracked by currentSupercardCounted flag)
+        if (!currentSupercardCounted && state.card.word && state.card.id) {
+            incrementDailySupercardCount();
+            updateDailySupercardCounter();
+            currentSupercardCounted = true;
+        }
     } else {
         btnNextBottom.style.display = 'none';
     }

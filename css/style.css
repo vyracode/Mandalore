@@ -164,6 +164,32 @@ nav {
     flex-shrink: 0;
 }
 
+/* Skip button in front card footer */
+.btn-next-footer {
+    height: 28px;
+    padding: 0 12px;
+    border-radius: 14px;
+    font-size: 12px;
+    font-weight: 900;
+    flex-shrink: 0;
+    margin-left: auto;
+}
+
+/* Daily supercard counter */
+.daily-counter {
+    height: 28px;
+    padding: 0 12px;
+    border-radius: 14px;
+    font-size: 13px;
+    font-weight: 900;
+    color: rgba(255, 255, 255, .86);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    font-family: "Google Sans", system-ui, -apple-system, sans-serif;
+}
+
 /* Next button at bottom of card stack (appears when all finished) */
 .btn-next-bottom {
     width: 100%;
@@ -428,7 +454,7 @@ nav {
 .front-foot {
     display: flex;
     align-items: center;
-    justify-content: flex-start;
+    justify-content: space-between;
     gap: 10px;
     color: rgba(255, 255, 255, .70);
     font-family: "Google Sans", system-ui, -apple-system, sans-serif;

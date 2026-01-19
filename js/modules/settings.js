@@ -872,3 +872,145 @@ export function forgetFSRS() {
     saveState();
     renderFSRSStats();
 }
+
+/**
+ * View all flashcard statistics in a modal
+ */
+export function viewFlashcardStats() {
+    const modal = $('#flashcardStatsModal');
+    const container = $('#flashcardStatsContainer');
+    
+    if (!modal || !container) return;
+    
+    // Clear existing content
+    container.innerHTML = '';
+    
+    if (!state.wordlist || state.wordlist.length === 0) {
+        container.innerHTML = '<div class="stats-empty-state">No words loaded. Import a wordlist to start tracking statistics.</div>';
+        modal.style.display = 'flex';
+        return;
+    }
+    
+    const FRONT_TYPES = ['hanzi', 'pronunciation', 'meaning'];
+    const FRONT_LABELS = { hanzi: 'Hanzi', pronunciation: 'Audio', meaning: 'Meaning' };
+    
+    // FSRS State enum values
+    const State = typeof FSRS !== 'undefined' ? FSRS.State : {
+        New: 0,
+        Learning: 1,
+        Review: 2,
+        Relearning: 3
+    };
+    
+    const getStateLabel = (stateValue) => {
+        switch (stateValue) {
+            case State.New: return { label: 'New', class: 'prof-new' };
+            case State.Learning: return { label: 'Learning', class: 'prof-learning' };
+            case State.Review: return { label: 'Review', class: 'prof-review' };
+            case State.Relearning: return { label: 'Relearning', class: 'prof-relearning' };
+            default: return { label: 'New', class: 'prof-new' };
+        }
+    };
+    
+    // Build table
+    let html = `
+        <table class="flashcard-stats-table">
+            <thead>
+                <tr>
+                    <th>Word</th>
+                    <th>Pinyin</th>
+                    <th>Meaning</th>
+    `;
+    
+    // Add headers for each front → back modality mapping
+    for (const front of FRONT_TYPES) {
+        const backModes = getBackModesForFront(front);
+        for (const backMode of backModes) {
+            const frontLabel = FRONT_LABELS[front];
+            const backLabel = FRONT_LABELS[backMode] || backMode;
+            html += `
+                <th class="modality-cell">
+                    <div class="modality-header">
+                        <span class="modality-front">${frontLabel} →</span>
+                        <span class="modality-back">${backLabel}</span>
+                    </div>
+                </th>
+            `;
+        }
+    }
+    
+    html += `
+                </tr>
+            </thead>
+            <tbody>
+    `;
+    
+    // Add rows for each word
+    for (const word of state.wordlist) {
+        const wordId = word.id || generateWordId(word.word, word.pinyinToned);
+        
+        html += `
+            <tr>
+                <td class="word-cell">${escapeHtml(word.word)}</td>
+                <td class="pinyin-cell">${escapeHtml(word.pinyinToned || '')}</td>
+                <td class="meaning-cell" title="${escapeHtml(word.meaning || '')}">${escapeHtml(word.meaning || '')}</td>
+        `;
+        
+        // Add cells for each front → back modality mapping
+        for (const front of FRONT_TYPES) {
+            const backModes = getBackModesForFront(front);
+            for (const backMode of backModes) {
+                const subcardKey = getSubcardKey(wordId, front, backMode);
+                const subcard = state.fsrsSubcards[subcardKey];
+                
+                let reps = 0;
+                let stateInfo = getStateLabel(State.New);
+                
+                if (subcard) {
+                    reps = subcard.reps || 0;
+                    const subcardState = subcard.state !== undefined ? subcard.state : State.New;
+                    stateInfo = getStateLabel(subcardState);
+                }
+                
+                html += `
+                    <td class="modality-cell">
+                        <div class="stat-value stat-reps">${reps}</div>
+                        <div class="stat-proficiency ${stateInfo.class}">${stateInfo.label}</div>
+                    </td>
+                `;
+            }
+        }
+        
+        html += `</tr>`;
+    }
+    
+    html += `
+            </tbody>
+        </table>
+    `;
+    
+    container.innerHTML = html;
+    
+    // Show modal
+    modal.style.display = 'flex';
+}
+
+/**
+ * Escape HTML for safe rendering
+ */
+function escapeHtml(text) {
+    if (!text) return '';
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+/**
+ * Close the flashcard stats modal
+ */
+export function closeFlashcardStatsModal() {
+    const modal = $('#flashcardStatsModal');
+    if (modal) {
+        modal.style.display = 'none';
+    }
+}

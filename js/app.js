@@ -2,7 +2,7 @@ import { state, loadState, saveState } from './state.js';
 import { $, on } from './modules/utils.js';
 import { renderFront, nextCard, resetAllBack, bindModality, updateDailySupercardCounter } from './modules/flashcards.js';
 import { setTranslationDir, checkTranslation, newSentence, showTranslateA, handleFeedbackClick, renderFeedbackTokens, skipSentence, switchTranslationDir } from './modules/translation.js';
-import { renderKeyStatus, handleImport, handleForgetList, forgetKey, saveKey, copyPrompt, renderModel, handleModelChange, triggerBrowse, handleFileSelect, clearCacheAndReload, loadVersionInfo, setupTextareaAutoResize, renderSentenceCount, renderWordCount, viewSentences, closeModal, forgetSentences, renderFSRSStats, forgetFSRS } from './modules/settings.js';
+import { renderKeyStatus, handleImport, handleForgetList, forgetKey, saveKey, copyPrompt, renderModel, handleModelChange, triggerBrowse, handleFileSelect, clearCacheAndReload, loadVersionInfo, setupTextareaAutoResize, renderSentenceCount, renderWordCount, viewSentences, closeModal, forgetSentences, renderFSRSStats, forgetFSRS, viewFlashcardStats, closeFlashcardStatsModal } from './modules/settings.js';
 
 
 function runSmokeTests() {
@@ -98,12 +98,15 @@ on('#fileInput', 'change', handleFileSelect);
 on('#btnForgetList', 'click', handleForgetList);
 on('#btnViewSentences', 'click', viewSentences);
 on('#btnForgetSentences', 'click', forgetSentences);
+on('#btnViewFlashcardStats', 'click', viewFlashcardStats);
 on('#btnForgetFSRS', 'click', forgetFSRS);
 on('#btnClearCache', 'click', clearCacheAndReload);
 
 // Modal controls
 on('#btnCloseModal', 'click', closeModal);
 on('#modalOverlay', 'click', closeModal);
+on('#btnCloseFlashcardStatsModal', 'click', closeFlashcardStatsModal);
+on('#flashcardStatsModalOverlay', 'click', closeFlashcardStatsModal);
 
 // Reset UI removed as per request. Use individual Forget buttons.
 

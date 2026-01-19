@@ -180,8 +180,10 @@ export function getNextSupercard(wordlist, fsrsSubcards, lastWordId = '') {
                     hasAnyDue = true;
                     const priority = isDue ? (now - dueDate) : Infinity;
                     
-                    // Track most due subcard
-                    if (priority < mostDuePriority || (priority === Infinity && mostDuePriority === Infinity && (!mostDueDate || dueDate < mostDueDate))) {
+                    // Track most due subcard (largest priority = most overdue)
+                    if ((mostDuePriority === Infinity && priority !== Infinity) || 
+                        (priority !== Infinity && mostDuePriority !== Infinity && priority > mostDuePriority) ||
+                        (priority === Infinity && mostDuePriority === Infinity && (!mostDueDate || dueDate < mostDueDate))) {
                         mostDueSubcard = subcard;
                         mostDueDate = dueDate;
                         mostDuePriority = priority;
@@ -233,7 +235,10 @@ export function getNextSupercard(wordlist, fsrsSubcards, lastWordId = '') {
                         hasAnyDue = true;
                         const priority = isDue ? (now - dueDate) : Infinity;
                         
-                        if (priority < mostDuePriority || (priority === Infinity && mostDuePriority === Infinity && (!mostDueDate || dueDate < mostDueDate))) {
+                        // Track most due subcard (largest priority = most overdue)
+                        if ((mostDuePriority === Infinity && priority !== Infinity) || 
+                            (priority !== Infinity && mostDuePriority !== Infinity && priority > mostDuePriority) ||
+                            (priority === Infinity && mostDuePriority === Infinity && (!mostDueDate || dueDate < mostDueDate))) {
                             mostDueSubcard = subcard;
                             mostDueDate = dueDate;
                             mostDuePriority = priority;
@@ -336,7 +341,7 @@ export function getNextSupercard(wordlist, fsrsSubcards, lastWordId = '') {
     }
     
     // Sort by priority (most overdue first)
-    supercards.sort((a, b) => a.priority - b.priority);
+    supercards.sort((a, b) => b.priority - a.priority);
     
     // Randomly select from top 20% most overdue supercards (or top 3, whichever is larger)
     const topCount = Math.max(3, Math.ceil(supercards.length * 0.2));

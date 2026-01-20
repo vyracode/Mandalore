@@ -912,6 +912,147 @@ export function viewFlashcardStats() {
         }
     };
     
+    /**
+     * Calculate word dueness (maximum priority across all supercards for this word)
+     * Matches the logic used in getNextSupercard for card selection
+     * Returns { priority: number|Infinity, earliestDueDate: Date|null }
+     */
+    const calculateWordDueness = (wordId) => {
+        const now = new Date();
+        let wordMaxPriority = -Infinity;
+        let wordEarliestDueDate = null;
+        
+        // Check all supercards for this word
+        for (const front of FRONT_TYPES) {
+            const backModes = getBackModesForFront(front);
+            let mostDuePriority = Infinity;
+            let mostDueDate = null;
+            let hasAnyDue = false;
+            
+            // Find most due subcard for this supercard (exactly matching getNextSupercard logic)
+            for (const backMode of backModes) {
+                const subcard = getOrCreateSubcard(wordId, front, backMode, state.fsrsSubcards);
+                if (!subcard) continue;
+                
+                const dueDate = subcard.due ? new Date(subcard.due) : new Date(0);
+                const isDue = dueDate <= now;
+                
+                if (isDue || !subcard.last_review) {
+                    hasAnyDue = true;
+                    const priority = isDue ? (now - dueDate) : Infinity;
+                    
+                    // Track most due subcard (largest priority = most overdue)
+                    if ((mostDuePriority === Infinity && priority !== Infinity) || 
+                        (priority !== Infinity && mostDuePriority !== Infinity && priority > mostDuePriority) ||
+                        (priority === Infinity && mostDuePriority === Infinity && (!mostDueDate || dueDate < mostDueDate))) {
+                        mostDueDate = dueDate;
+                        mostDuePriority = priority;
+                    }
+                } else {
+                    // Not due yet, but check if it's earlier than current most due
+                    if (!mostDueDate || dueDate < mostDueDate) {
+                        mostDueDate = dueDate;
+                        mostDuePriority = Infinity;
+                    }
+                }
+            }
+            
+            // Update word-level max priority (take maximum across all supercards)
+            if (hasAnyDue || mostDueDate) {
+                if (mostDuePriority === Infinity) {
+                    // This supercard is not overdue
+                    if (wordMaxPriority === -Infinity || wordMaxPriority === Infinity) {
+                        // Track earliest due date across all supercards
+                        if (!wordEarliestDueDate || (mostDueDate && mostDueDate < wordEarliestDueDate)) {
+                            wordEarliestDueDate = mostDueDate;
+                        }
+                        if (wordMaxPriority === -Infinity) {
+                            wordMaxPriority = Infinity;
+                        }
+                    }
+                } else {
+                    // This supercard is overdue - use it if it's higher priority
+                    if (wordMaxPriority === -Infinity || wordMaxPriority === Infinity || mostDuePriority > wordMaxPriority) {
+                        wordMaxPriority = mostDuePriority;
+                        wordEarliestDueDate = mostDueDate;
+                    }
+                }
+            }
+        }
+        
+        // If no supercards found, return Infinity
+        if (wordMaxPriority === -Infinity) {
+            wordMaxPriority = Infinity;
+        }
+        
+        return {
+            priority: wordMaxPriority,
+            earliestDueDate: wordEarliestDueDate
+        };
+    };
+    
+    /**
+     * Get color class for dueness based on priority
+     */
+    const getDuenessColorClass = (priority) => {
+        if (priority === Infinity) {
+            return 'dueness-not-due';
+        }
+        
+        // Priority is milliseconds overdue
+        const ms = priority;
+        const hours = ms / (1000 * 60 * 60);
+        const days = hours / 24;
+        
+        // Color coding based on how overdue:
+        // Very overdue (>7 days): red
+        // Moderately overdue (1-7 days): orange
+        // Slightly overdue (<1 day): yellow
+        if (days >= 7) {
+            return 'dueness-very-overdue';
+        } else if (days >= 1) {
+            return 'dueness-moderately-overdue';
+        } else {
+            return 'dueness-slightly-overdue';
+        }
+    };
+    
+    /**
+     * Format dueness value for display
+     */
+    const formatDueness = (dueness) => {
+        if (dueness.priority === Infinity) {
+            if (dueness.earliestDueDate) {
+                const daysUntil = Math.ceil((dueness.earliestDueDate - new Date()) / (1000 * 60 * 60 * 24));
+                if (daysUntil <= 0) {
+                    return 'Due';
+                } else if (daysUntil === 1) {
+                    return 'Due tomorrow';
+                } else {
+                    return `Due in ${daysUntil} days`;
+                }
+            }
+            return 'Not due';
+        } else {
+            // Priority is milliseconds overdue
+            const ms = dueness.priority;
+            const seconds = Math.floor(ms / 1000);
+            const minutes = Math.floor(seconds / 60);
+            const hours = Math.floor(minutes / 60);
+            const days = Math.floor(hours / 24);
+            
+            if (days > 0) {
+                return `${days.toFixed(1)}d overdue`;
+            } else if (hours > 0) {
+                return `${hours.toFixed(1)}h overdue`;
+            } else if (minutes > 0) {
+                return `${minutes.toFixed(1)}m overdue`;
+            } else {
+                return `${seconds.toFixed(0)}s overdue`;
+            }
+        }
+    };
+    
     // Build table
     let html = `
         <table class="flashcard-stats-table">
@@ -920,6 +1061,7 @@ export function viewFlashcardStats() {
                     <th>Word</th>
                     <th>Pinyin</th>
                     <th>Meaning</th>
+                    <th>Dueness</th>
     `;
     
     // Add headers for each front → back modality mapping
@@ -945,15 +1087,65 @@ export function viewFlashcardStats() {
             <tbody>
     `;
     
-    // Add rows for each word
-    for (const word of state.wordlist) {
+    // Calculate dueness for all words and prepare for sorting
+    const wordsWithDueness = state.wordlist.map(word => {
         const wordId = word.id || generateWordId(word.word, word.pinyinToned);
+        const dueness = calculateWordDueness(wordId);
+        return {
+            word,
+            wordId,
+            dueness
+        };
+    });
+    
+    // Sort by priority (highest priority = most overdue first)
+    // Infinity values go to the end
+    wordsWithDueness.sort((a, b) => {
+        const aPriority = a.dueness.priority;
+        const bPriority = b.dueness.priority;
+        
+        // Both are Infinity - sort by earliest due date
+        if (aPriority === Infinity && bPriority === Infinity) {
+            if (!a.dueness.earliestDueDate && !b.dueness.earliestDueDate) return 0;
+            if (!a.dueness.earliestDueDate) return 1;
+            if (!b.dueness.earliestDueDate) return -1;
+            return a.dueness.earliestDueDate - b.dueness.earliestDueDate;
+        }
+        
+        // One is Infinity - non-Infinity comes first
+        if (aPriority === Infinity) return 1;
+        if (bPriority === Infinity) return -1;
+        
+        // Both are numbers - higher priority (more overdue) comes first
+        return bPriority - aPriority;
+    });
+    
+    // Determine which words are in the "top candidates" pool
+    // The selection algorithm picks from top 20% most overdue (or top 3, whichever is larger)
+    // We'll highlight words that have at least one supercard in the top pool
+    const overdueWords = wordsWithDueness.filter(w => w.dueness.priority !== Infinity);
+    const topCount = Math.max(3, Math.ceil(overdueWords.length * 0.2));
+    const topWordsSet = new Set();
+    
+    if (overdueWords.length > 0) {
+        // Get top N words by priority
+        const topWords = overdueWords.slice(0, topCount);
+        topWords.forEach(w => topWordsSet.add(w.wordId));
+    }
+    
+    // Render sorted rows
+    for (const { word, wordId, dueness } of wordsWithDueness) {
+        const duenessDisplay = formatDueness(dueness);
+        const duenessColorClass = getDuenessColorClass(dueness.priority);
+        const isTopCandidate = topWordsSet.has(wordId);
+        const topCandidateClass = isTopCandidate ? 'top-candidate' : '';
         
         html += `
             <tr>
                 <td class="word-cell">${escapeHtml(word.word)}</td>
                 <td class="pinyin-cell">${escapeHtml(word.pinyinToned || '')}</td>
                 <td class="meaning-cell" title="${escapeHtml(word.meaning || '')}">${escapeHtml(word.meaning || '')}</td>
+                <td class="dueness-cell ${duenessColorClass} ${topCandidateClass}" title="Priority: ${dueness.priority === Infinity ? 'Infinity' : dueness.priority.toFixed(0)}ms">${duenessDisplay}</td>
         `;
         
         // Add cells for each front → back modality mapping

@@ -1754,6 +1754,11 @@ input[type="text"]:disabled {
     background: rgba(255, 255, 255, .04);
 }
 
+.flashcard-stats-table .dueness-cell.top-candidate {
+    border: 2px solid var(--cyan);
+    box-shadow: 0 0 0 2px rgba(40, 216, 255, .2);
+}
+
 .flashcard-stats-table .word-cell {
     font-family: "Noto Sans SC", system-ui, -apple-system, sans-serif;
     font-size: 16px;
@@ -1772,6 +1777,36 @@ input[type="text"]:disabled {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+}
+
+.flashcard-stats-table .dueness-cell {
+    font-family: "JetBrains Mono", monospace;
+    font-size: 11px;
+    font-weight: 600;
+    text-align: center;
+    min-width: 100px;
+    padding: 8px 12px;
+    border-radius: 6px;
+}
+
+.flashcard-stats-table .dueness-cell.dueness-very-overdue {
+    color: var(--pink);
+    background: rgba(255, 79, 216, .15);
+}
+
+.flashcard-stats-table .dueness-cell.dueness-moderately-overdue {
+    color: var(--orange);
+    background: rgba(255, 176, 32, .15);
+}
+
+.flashcard-stats-table .dueness-cell.dueness-slightly-overdue {
+    color: var(--cyan);
+    background: rgba(40, 216, 255, .15);
+}
+
+.flashcard-stats-table .dueness-cell.dueness-not-due {
+    color: rgba(255, 255, 255, .5);
+    background: transparent;
 }
 
 .flashcard-stats-table .modality-cell {

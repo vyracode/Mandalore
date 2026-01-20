@@ -178,27 +178,27 @@ export function getNextSupercard(wordlist, fsrsSubcards, lastWordId = '') {
                 
                 if (isDue || !subcard.last_review) {
                     hasAnyDue = true;
-                    const priority = isDue ? (now - dueDate) : Infinity;
+                    // New cards (!subcard.last_review) get very high priority (1e10) to prioritize them
+                    // Due cards get priority = now - dueDate (larger = more overdue)
+                    const priority = !subcard.last_review ? 1e10 : (now - dueDate);
                     
-                    // Track most due subcard (largest priority = most overdue)
-                    if ((mostDuePriority === Infinity && priority !== Infinity) || 
-                        (priority !== Infinity && mostDuePriority !== Infinity && priority > mostDuePriority) ||
-                        (priority === Infinity && mostDuePriority === Infinity && (!mostDueDate || dueDate < mostDueDate))) {
+                    // Track most due subcard (largest priority = most overdue/newest)
+                    if (priority > mostDuePriority || 
+                        (priority === mostDuePriority && (!mostDueDate || dueDate < mostDueDate))) {
                         mostDueSubcard = subcard;
                         mostDueDate = dueDate;
                         mostDuePriority = priority;
                     }
                 } else {
-                    // Not due yet, but check if it's earlier than current most due
+                    // Not due yet - don't add to pool, but track for upcoming section
                     if (!mostDueDate || dueDate < mostDueDate) {
                         mostDueDate = dueDate;
-                        mostDuePriority = Infinity;
                     }
                 }
             }
             
-            // Add supercard if it has any subcards (due or upcoming)
-            if (hasAnyDue || mostDueDate) {
+            // Only add supercard if it has due subcards (not future-due ones)
+            if (hasAnyDue) {
                 supercards.push({
                     word,
                     front,
@@ -233,25 +233,27 @@ export function getNextSupercard(wordlist, fsrsSubcards, lastWordId = '') {
                     
                     if (isDue || !subcard.last_review) {
                         hasAnyDue = true;
-                        const priority = isDue ? (now - dueDate) : Infinity;
+                        // New cards (!subcard.last_review) get very high priority (1e10) to prioritize them
+                        // Due cards get priority = now - dueDate (larger = more overdue)
+                        const priority = !subcard.last_review ? 1e10 : (now - dueDate);
                         
-                        // Track most due subcard (largest priority = most overdue)
-                        if ((mostDuePriority === Infinity && priority !== Infinity) || 
-                            (priority !== Infinity && mostDuePriority !== Infinity && priority > mostDuePriority) ||
-                            (priority === Infinity && mostDuePriority === Infinity && (!mostDueDate || dueDate < mostDueDate))) {
+                        // Track most due subcard (largest priority = most overdue/newest)
+                        if (priority > mostDuePriority || 
+                            (priority === mostDuePriority && (!mostDueDate || dueDate < mostDueDate))) {
                             mostDueSubcard = subcard;
                             mostDueDate = dueDate;
                             mostDuePriority = priority;
                         }
                     } else {
+                        // Not due yet - don't add to pool, but track for upcoming section
                         if (!mostDueDate || dueDate < mostDueDate) {
                             mostDueDate = dueDate;
-                            mostDuePriority = Infinity;
                         }
                     }
                 }
                 
-                if (hasAnyDue || mostDueDate) {
+                // Only add supercard if it has due subcards (not future-due ones)
+                if (hasAnyDue) {
                     supercards.push({
                         word,
                         front,

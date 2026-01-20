@@ -2,7 +2,8 @@ import { state, loadState, saveState } from './state.js';
 import { $, on } from './modules/utils.js';
 import { renderFront, nextCard, resetAllBack, bindModality, updateDailySupercardCounter } from './modules/flashcards.js';
 import { setTranslationDir, checkTranslation, newSentence, showTranslateA, handleFeedbackClick, renderFeedbackTokens, skipSentence, switchTranslationDir } from './modules/translation.js';
-import { renderKeyStatus, handleImport, handleForgetList, forgetKey, saveKey, copyPrompt, renderModel, handleModelChange, triggerBrowse, handleFileSelect, clearCacheAndReload, loadVersionInfo, setupTextareaAutoResize, renderSentenceCount, renderWordCount, viewSentences, closeModal, forgetSentences, renderFSRSStats, forgetFSRS, viewFlashcardStats, closeFlashcardStatsModal } from './modules/settings.js';
+import { renderKeyStatus, handleImport, handleForgetList, forgetKey, saveKey, copyPrompt, renderModel, handleModelChange, triggerBrowse, handleFileSelect, clearCacheAndReload, loadVersionInfo, setupTextareaAutoResize, renderSentenceCount, renderWordCount, viewSentences, closeModal, forgetSentences, renderFSRSStats, forgetFSRS } from './modules/settings.js';
+import { getDiagnosticReport, verifySystemHealth, getNextSupercard } from './modules/fsrs.js';
 
 
 function runSmokeTests() {
@@ -98,15 +99,12 @@ on('#fileInput', 'change', handleFileSelect);
 on('#btnForgetList', 'click', handleForgetList);
 on('#btnViewSentences', 'click', viewSentences);
 on('#btnForgetSentences', 'click', forgetSentences);
-on('#btnViewFlashcardStats', 'click', viewFlashcardStats);
 on('#btnForgetFSRS', 'click', forgetFSRS);
 on('#btnClearCache', 'click', clearCacheAndReload);
 
 // Modal controls
 on('#btnCloseModal', 'click', closeModal);
 on('#modalOverlay', 'click', closeModal);
-on('#btnCloseFlashcardStatsModal', 'click', closeFlashcardStatsModal);
-on('#flashcardStatsModalOverlay', 'click', closeFlashcardStatsModal);
 
 // Reset UI removed as per request. Use individual Forget buttons.
 
@@ -130,3 +128,64 @@ renderFeedbackTokens();
 loadVersionInfo();
 setupTextareaAutoResize();
 runSmokeTests();
+
+// Expose debug functions globally for console access
+window.MandaloreDebug = {
+    /**
+     * Get a full diagnostic report of the card system
+     * Usage: MandaloreDebug.report()
+     */
+    report: () => {
+        const report = getDiagnosticReport(state.wordlist, state.fsrsSubcards);
+        console.log(JSON.stringify(report, null, 2));
+        return report;
+    },
+    
+    /**
+     * Check system health for any issues
+     * Usage: MandaloreDebug.health()
+     */
+    health: () => {
+        const issues = verifySystemHealth(state.wordlist, state.fsrsSubcards);
+        if (issues.length === 0) {
+            console.log('✅ System health check passed! No issues found.');
+        } else {
+            console.warn(`⚠️ Found ${issues.length} issue(s):`);
+            issues.forEach((issue, i) => console.warn(`  ${i + 1}. ${issue}`));
+        }
+        return issues;
+    },
+    
+    /**
+     * View current state data
+     * Usage: MandaloreDebug.state()
+     */
+    state: () => {
+        console.log('Wordlist size:', state.wordlist?.length || 0);
+        console.log('FSRS subcards:', Object.keys(state.fsrsSubcards || {}).length);
+        console.log('Last shown tracking:', Object.keys(state.supercardLastShown || {}).length, 'entries');
+        console.log('Consecutive counters:', {
+            due: state.consecutiveDueCards,
+            new: state.consecutiveNewCards
+        });
+        console.log('Daily stats:', {
+            count: state.dailySupercardCount,
+            date: state.dailySupercardDate
+        });
+        return state;
+    },
+    
+    /**
+     * Manually trigger card selection preview (dry run)
+     * Usage: MandaloreDebug.previewSelection()
+     */
+    previewSelection: () => {
+        console.log('Calling getNextSupercard to preview selection...');
+        // Note: This will actually select a card and update lastShown,
+        // but won't navigate. Use with caution.
+        return getNextSupercard(state.wordlist, state.fsrsSubcards, state.lastWordId);
+    },
+    
+};
+
+console.log('💡 Debug utilities available: MandaloreDebug.report(), MandaloreDebug.health(), MandaloreDebug.state()');

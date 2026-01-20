@@ -33,7 +33,10 @@ export const state = {
     fsrsSubcards: {}, // Map of subcardKey -> FSRS subcard data: { wordId_front_backMode -> card }
     lastWordId: '', // Track last word ID shown to avoid showing same word twice in a row
     dailySupercardCount: 0, // Count of supercards completed today
-    dailySupercardDate: null // Date string (YYYY-MM-DD) for the day this count is for
+    dailySupercardDate: null, // Date string (YYYY-MM-DD) for the day this count is for
+    consecutiveDueCards: 0, // Track consecutive review card picks to ensure new cards are shown
+    consecutiveNewCards: 0, // Track consecutive new card picks to ensure review cards are shown
+    supercardLastShown: {} // Map of supercardKey (wordId_front) -> ISO timestamp of last shown
 };
 
 const STORAGE_KEY = 'mandalore_state_v1';
@@ -58,7 +61,10 @@ export function saveState() {
             cachedSentences: state.cachedSentences,
             fsrsSubcards: serializedFsrsSubcards,
             dailySupercardCount: state.dailySupercardCount,
-            dailySupercardDate: state.dailySupercardDate
+            dailySupercardDate: state.dailySupercardDate,
+            consecutiveDueCards: state.consecutiveDueCards || 0,
+            consecutiveNewCards: state.consecutiveNewCards || 0,
+            supercardLastShown: state.supercardLastShown || {}
         };
         localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
     } catch (e) {
@@ -102,6 +108,25 @@ export function loadState() {
         }
         if (data.dailySupercardDate) {
             state.dailySupercardDate = data.dailySupercardDate;
+        }
+        
+        // Load consecutive pool counters
+        if (typeof data.consecutiveDueCards === 'number') {
+            state.consecutiveDueCards = data.consecutiveDueCards;
+        } else {
+            state.consecutiveDueCards = 0;
+        }
+        if (typeof data.consecutiveNewCards === 'number') {
+            state.consecutiveNewCards = data.consecutiveNewCards;
+        } else {
+            state.consecutiveNewCards = 0;
+        }
+        
+        // Load supercard last shown timestamps (for anti-limbo tracking)
+        if (data.supercardLastShown && typeof data.supercardLastShown === 'object') {
+            state.supercardLastShown = data.supercardLastShown;
+        } else {
+            state.supercardLastShown = {};
         }
         
         // Reset counter if it's a new day

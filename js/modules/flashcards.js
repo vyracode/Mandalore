@@ -187,6 +187,8 @@ function generateHanziChoices(targetWord, targetPinyin, count = 5) {
 }
 
 export function nextCard() {
+    console.log('FSRS subcards count:', Object.keys(state.fsrsSubcards || {}).length);
+    
     // Reset separated state for new card
     inputsSeparated = false;
     
@@ -218,6 +220,7 @@ export function nextCard() {
     
     if (!state.wordlist || state.wordlist.length === 0) {
         // Empty state
+        console.log('Empty wordlist, showing empty state');
         state.card.word = null;
         state.card.id = '';
         state.lastWordId = '';
@@ -243,6 +246,7 @@ export function nextCard() {
             }
         }
         
+        console.log('Using random fallback. Available words:', availableWords.length);
         const item = availableWords[Math.floor(Math.random() * availableWords.length)];
         const front = FRONT_ORDER[Math.floor(Math.random() * FRONT_ORDER.length)];
         
@@ -254,6 +258,12 @@ export function nextCard() {
         state.card.meaning = item.meaning;
         state.card.front = front;
         state.lastWordId = state.card.id;
+        
+        console.log('Selected random card:', {
+            wordId: state.card.id,
+            word: state.card.word,
+            front: state.card.front
+        });
     } else {
         // Use FSRS-selected supercard
         const item = next.word;
@@ -267,6 +277,14 @@ export function nextCard() {
         state.card.meaning = item.meaning;
         state.card.front = front;
         state.lastWordId = state.card.id; // Track this word as the last shown
+        
+        console.log('Selected FSRS card:', {
+            wordId: state.card.id,
+            word: state.card.word,
+            front: state.card.front
+        });
+        
+        const backModes = getBackModesForFront(front);
     }
 
     renderFront();
@@ -450,7 +468,10 @@ function resetModality(modCard) {
  * @param {boolean} passed - Whether the user passed this subcard
  */
 function recordSubcardReview(backMode, passed) {
-    if (!state.card.word || !state.card.id || !state.card.front) return;
+    if (!state.card.word || !state.card.id || !state.card.front) {
+        console.log('recordSubcardReview: Missing card data, skipping');
+        return;
+    }
     
     const wordId = state.card.id;
     const front = state.card.front;
@@ -458,6 +479,7 @@ function recordSubcardReview(backMode, passed) {
     
     // Avoid double-recording
     if (recordedSubcards.has(subcardKey)) {
+        console.log('Already recorded this subcard, skipping');
         return;
     }
     
@@ -507,6 +529,8 @@ export function resetAllBack() {
     const allMods = ['#modPron', '#modPinyin', '#modHanzi', '#modMeaning', '#modHanziTyping'];
     const frontMod = state.card.front ? frontToMod[state.card.front] : null;
     
+    const modVisibility = [];
+    
     allMods.forEach(sel => {
         const modCard = $(sel);
         if (!modCard) return;
@@ -514,20 +538,25 @@ export function resetAllBack() {
         if (sel === frontMod) {
             // Hide the front modality
             modCard.style.display = 'none';
+            modVisibility.push(`${sel}: hidden (front)`);
         } else if (sel === '#modHanziTyping') {
             // Show Hanzi Typing only when both Hanzi and Pinyin are on back and not separated
             if (showHanziTyping) {
                 modCard.style.display = '';
                 resetModality(modCard);
+                modVisibility.push(`${sel}: visible`);
             } else {
                 modCard.style.display = 'none';
+                modVisibility.push(`${sel}: hidden (not combined mode)`);
             }
         } else if ((sel === '#modHanzi' || sel === '#modPinyin') && showHanziTyping) {
             // Hide individual Hanzi and Pinyin when showing Hanzi Typing
             modCard.style.display = 'none';
+            modVisibility.push(`${sel}: hidden (using HanziTyping)`);
         } else {
             modCard.style.display = '';
             resetModality(modCard);
+            modVisibility.push(`${sel}: visible`);
         }
     });
 }
@@ -644,13 +673,17 @@ function checkAllFinished() {
     const allMods = ['#modPron', '#modPinyin', '#modHanzi', '#modMeaning', '#modHanziTyping'];
     let allFinished = true;
     let visibleCount = 0;
+    const modStates = [];
     
     for (const sel of allMods) {
         const modCard = $(sel);
         if (!modCard) continue;
         
         // Skip hidden cards
-        if (modCard.style.display === 'none') continue;
+        if (modCard.style.display === 'none') {
+            modStates.push(`${sel}: hidden`);
+            continue;
+        }
         
         visibleCount++;
         
@@ -661,14 +694,15 @@ function checkAllFinished() {
             const speakBlock = $('.pron-speak', modCard);
             const toneFinished = toneBlock && toneBlock.dataset.pronState === 'finished';
             const speakFinished = speakBlock && speakBlock.dataset.pronState === 'finished';
+            modStates.push(`${sel}: tone=${toneFinished}, speech=${speakFinished}`);
             if (!toneFinished || !speakFinished) {
                 allFinished = false;
-                break;
             }
         } else {
-            if (modCard.dataset.state !== 'finished') {
+            const state = modCard.dataset.state;
+            modStates.push(`${sel}: ${state}`);
+            if (state !== 'finished') {
                 allFinished = false;
-                break;
             }
         }
     }

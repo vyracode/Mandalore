@@ -2,7 +2,7 @@ import { state, loadState, saveState } from './state.js';
 import { $, on } from './modules/utils.js';
 import { renderFront, nextCard, resetAllBack, bindModality, updateDailySupercardCounter } from './modules/flashcards.js';
 import { setTranslationDir, checkTranslation, newSentence, showTranslateA, handleFeedbackClick, renderFeedbackTokens, skipSentence, switchTranslationDir } from './modules/translation.js';
-import { renderKeyStatus, handleImport, handleForgetList, forgetKey, saveKey, copyPrompt, renderModel, handleModelChange, triggerBrowse, handleFileSelect, clearCacheAndReload, loadVersionInfo, setupTextareaAutoResize, renderSentenceCount, renderWordCount, viewSentences, closeModal, forgetSentences, renderFSRSStats, forgetFSRS } from './modules/settings.js';
+import { renderKeyStatus, handleImport, handleForgetList, forgetKey, saveKey, copyPrompt, renderModel, handleModelChange, triggerBrowse, handleFileSelect, clearCacheAndReload, loadVersionInfo, setupTextareaAutoResize, renderSentenceCount, renderWordCount, viewSentences, closeModal, forgetSentences, renderFSRSStats, forgetFSRS, viewAllSupercards, closeSupercardsModal, closeWordDetailModal } from './modules/settings.js';
 import { getDiagnosticReport, verifySystemHealth, getNextSupercard } from './modules/fsrs.js';
 
 
@@ -100,11 +100,16 @@ on('#btnForgetList', 'click', handleForgetList);
 on('#btnViewSentences', 'click', viewSentences);
 on('#btnForgetSentences', 'click', forgetSentences);
 on('#btnForgetFSRS', 'click', forgetFSRS);
+on('#btnViewAllSupercards', 'click', viewAllSupercards);
 on('#btnClearCache', 'click', clearCacheAndReload);
 
 // Modal controls
 on('#btnCloseModal', 'click', closeModal);
 on('#modalOverlay', 'click', closeModal);
+on('#btnCloseSupercardsModal', 'click', closeSupercardsModal);
+on('#supercardsModalOverlay', 'click', closeSupercardsModal);
+on('#btnCloseWordDetailModal', 'click', closeWordDetailModal);
+on('#wordDetailModalOverlay', 'click', closeWordDetailModal);
 
 // Reset UI removed as per request. Use individual Forget buttons.
 

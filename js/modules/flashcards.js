@@ -5,7 +5,7 @@ import { generateWordId } from './wordId.js';
 import { getSubcardKey, getOrCreateSubcard, getNextSupercard, recordReview, getBackModesForFront } from './fsrs.js';
 
 const FRONT_ORDER = ['hanzi', 'pronunciation', 'meaning'];
-const FRONT_LABEL = { hanzi: 'Hanzi', pronunciation: 'Audio', pinyin: 'Pinyin', meaning: 'Meaning' };
+export const FRONT_LABEL = { hanzi: 'Hanzi', pronunciation: 'Audio', pinyin: 'Pinyin', meaning: 'Meaning' };
 const FRONT_HINT = { hanzi: 'Recognize the word', pronunciation: 'Recognize the sound', pinyin: 'Recognize the spelling', meaning: 'Recall the Mandarin' };
 
 // Track if user has separated inputs for current card (resets on next card)

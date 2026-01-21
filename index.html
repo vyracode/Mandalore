@@ -412,6 +412,7 @@
                                 <!-- Stats will be rendered here -->
                             </div>
                             <div style="display:flex; gap:10px; margin-top: 12px;">
+                                <button class="btn primary" id="btnViewAllSupercards" style="flex:1" type="button">View All</button>
                                 <button class="btn ghost" id="btnForgetFSRS" style="flex:1" type="button">Forget</button>
                             </div>
                         </div>
@@ -466,6 +467,34 @@
             </div>
             <div class="modal-body" id="sentencesListContainer">
                 <!-- Sentences will be populated here -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Supercards List Popup -->
+    <div id="supercardsModal" class="modal" style="display: none;">
+        <div class="modal-overlay" id="supercardsModalOverlay"></div>
+        <div class="modal-content" style="max-width: 800px;">
+            <div class="modal-header">
+                <h3>All Supercards (Selection Order)</h3>
+                <button class="btn-close" id="btnCloseSupercardsModal" type="button" aria-label="Close">✕</button>
+            </div>
+            <div class="modal-body" id="supercardsListContainer">
+                <!-- List will be populated here -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Word Detail Popup -->
+    <div id="wordDetailModal" class="modal" style="display: none; z-index: 10001;">
+        <div class="modal-overlay" id="wordDetailModalOverlay"></div>
+        <div class="modal-content" style="max-width: 600px;">
+            <div class="modal-header">
+                <h3 id="wordDetailTitle">Word Details</h3>
+                <button class="btn-close" id="btnCloseWordDetailModal" type="button" aria-label="Close">✕</button>
+            </div>
+            <div class="modal-body" id="wordDetailContainer">
+                <!-- Detail content will be populated here -->
             </div>
         </div>
     </div>

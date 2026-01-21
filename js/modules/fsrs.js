@@ -706,6 +706,196 @@ export function getNextSupercard(wordlist, fsrsSubcards, lastWordId = '') {
 }
 
 /**
+ * Get all supercards with pedigree information in selection order
+ * Returns all supercards sorted by urgency, with pedigree reasons explaining why each will be shown
+ * 
+ * @param {Array} wordlist - List of words
+ * @param {Object} fsrsSubcards - Map of FSRS subcards
+ * @param {string} lastWordId - Last word ID shown (for ordering, but include all cards)
+ * @returns {Array} - Array of supercard objects with pedigree information
+ */
+export function getAllSupercardsWithPedigree(wordlist, fsrsSubcards, lastWordId = '') {
+    if (!wordlist || wordlist.length === 0) {
+        return [];
+    }
+    
+    const now = new Date();
+    
+    // Collect all supercards with their scores and pedigree info
+    const allSupercards = [];
+    
+    for (const word of wordlist) {
+        const wordId = word.id;
+        if (!wordId) {
+            console.warn('Word missing ID:', word.word);
+            continue;
+        }
+        
+        const isLastWord = lastWordId && wordId === lastWordId;
+        
+        for (const front of FRONT_TYPES) {
+            const backModes = getBackModesForFront(front);
+            
+            // Track subcard states for this supercard
+            let allSubcardsNew = true;
+            let hasOverdueSubcard = false;
+            let hasDueSubcard = false;
+            let bestReviewScore = -Infinity;
+            let mostUrgentBackMode = null; // Track which back mode drives selection
+            
+            // Analyze all subcards for this supercard
+            for (const backMode of backModes) {
+                const subcard = getOrCreateSubcard(wordId, front, backMode, fsrsSubcards);
+                if (!subcard) continue;
+                
+                const scoreResult = getRelativeOverdueScore(subcard, now);
+                
+                if (scoreResult.isNew) {
+                    // This subcard has never been reviewed
+                    // (allSubcardsNew stays true only if ALL are new)
+                } else {
+                    // This subcard has been reviewed at least once
+                    allSubcardsNew = false;
+                    
+                    // Track the best (most urgent) score among reviewed subcards
+                    // Also track which back mode produced this score
+                    if (scoreResult.score > bestReviewScore) {
+                        bestReviewScore = scoreResult.score;
+                        mostUrgentBackMode = backMode;
+                    }
+                    
+                    // Classify urgency:
+                    // score > 0 = overdue
+                    // score >= -0.5 = due within ~12 hours (treat as "due now")
+                    if (scoreResult.score > 0) {
+                        hasOverdueSubcard = true;
+                        hasDueSubcard = true;
+                    } else if (scoreResult.score >= -0.5) {
+                        hasDueSubcard = true;
+                    }
+                }
+            }
+            
+            // Calculate final urgency score for this supercard
+            let urgencyScore;
+            if (allSubcardsNew) {
+                // Completely new supercard - base score 0 (will be in NEW pool)
+                urgencyScore = 0;
+            } else {
+                // Has some reviewed subcards - use the most urgent one's score
+                urgencyScore = bestReviewScore;
+            }
+            
+            // ANTI-LIMBO BOOST: Check if this card hasn't been shown recently
+            const daysSinceShown = getDaysSinceLastShown(wordId, front);
+            let limboBoost = 0;
+            let isInLimbo = false;
+            const neverShown = daysSinceShown >= NEVER_SHOWN_DAYS;
+            
+            if (daysSinceShown >= LIMBO_BOOST_THRESHOLD_DAYS) {
+                const effectiveDays = Math.min(daysSinceShown, 365);
+                const logFactor = Math.log(Math.max(1, effectiveDays / LIMBO_BOOST_THRESHOLD_DAYS));
+                limboBoost = Math.min(
+                    LIMBO_BOOST_MULTIPLIER * (1 + logFactor),
+                    MAX_LIMBO_BOOST
+                );
+                if (neverShown) {
+                    limboBoost = MAX_LIMBO_BOOST;
+                }
+                isInLimbo = true;
+            }
+            
+            urgencyScore += limboBoost;
+            
+            // Determine pedigree reason
+            let pedigree;
+            if (allSubcardsNew) {
+                pedigree = { reason: 'New' };
+            } else if (hasOverdueSubcard || hasDueSubcard) {
+                // Practice - include the back mode that's driving selection
+                pedigree = { reason: 'Practice', backMode: mostUrgentBackMode };
+            } else if (isInLimbo) {
+                // In limbo but not overdue/due
+                pedigree = { reason: 'Limbo' };
+            } else if (daysSinceShown >= 1 && daysSinceShown < LIMBO_BOOST_THRESHOLD_DAYS) {
+                // Variety check would apply (not overdue/due, not in limbo, but less recently shown)
+                pedigree = { reason: 'Variety' };
+            } else {
+                // Fallback - not overdue/due, not in limbo, shown recently or never
+                // Still show as Practice with the most urgent back mode
+                pedigree = { reason: 'Practice', backMode: mostUrgentBackMode };
+            }
+            
+            allSupercards.push({
+                word,
+                front,
+                urgencyScore,
+                isCompletelyNew: allSubcardsNew,
+                hasOverdueSubcard,
+                hasDueSubcard,
+                isLastWord,
+                isInLimbo,
+                neverShown,
+                daysSinceShown,
+                mostUrgentBackMode,
+                pedigree
+            });
+        }
+    }
+    
+    // Separate cards into pools (excluding last word initially for ordering)
+    const availableCards = allSupercards.filter(sc => !sc.isLastWord);
+    
+    // Handle small wordlists - include last word with penalty
+    let cardsToConsider;
+    if (availableCards.length === 0) {
+        cardsToConsider = allSupercards;
+    } else if (wordlist.length <= 2 && availableCards.length < 3) {
+        cardsToConsider = allSupercards.map(sc => ({
+            ...sc,
+            urgencyScore: sc.isLastWord ? sc.urgencyScore - 200 : sc.urgencyScore
+        }));
+    } else {
+        cardsToConsider = availableCards;
+    }
+    
+    // Separate into pools
+    const newPool = cardsToConsider.filter(sc => sc.isCompletelyNew);
+    const reviewPool = cardsToConsider.filter(sc => !sc.isCompletelyNew);
+    
+    // Combine pools: NEW pool first (sorted), then REVIEW pool (sorted)
+    // This gives deterministic ordering: all new cards first, then all review cards
+    const combinedPool = [...newPool, ...reviewPool];
+    
+    // Sort combined pool by urgency score (highest = most urgent)
+    combinedPool.sort((a, b) => {
+        // Guard against NaN or undefined scores
+        const scoreA = Number.isFinite(a.urgencyScore) ? a.urgencyScore : 0;
+        const scoreB = Number.isFinite(b.urgencyScore) ? b.urgencyScore : 0;
+        
+        // PRIORITY 1: Never-shown cards get highest priority within their pool
+        if (a.neverShown && !b.neverShown) return -1;
+        if (!a.neverShown && b.neverShown) return 1;
+        
+        // PRIORITY 2: Urgency score (descending - higher = more urgent)
+        const scoreDiff = scoreB - scoreA;
+        if (Math.abs(scoreDiff) > 0.001) {
+            return scoreDiff;
+        }
+        
+        // PRIORITY 3: Tie-breaker - use consistent hash to avoid bias
+        const hashA = (a.word.id || '').charCodeAt(0) + a.front.charCodeAt(0);
+        const hashB = (b.word.id || '').charCodeAt(0) + b.front.charCodeAt(0);
+        if (hashA !== hashB) return hashA - hashB;
+        
+        // Final: consistent ordering for truly equal items (no randomness for deterministic list)
+        return 0;
+    });
+    
+    return combinedPool;
+}
+
+/**
  * Test card selection algorithm by simulating N card picks
  * Returns distribution of selected cards to verify no cards are stuck
  * 

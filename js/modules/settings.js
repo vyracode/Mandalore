@@ -1,9 +1,10 @@
 import { state, saveState } from '../state.js';
 import { $, $$ } from './utils.js';
 import { nextCard } from './flashcards.js';
+import { FRONT_LABEL } from './flashcards.js';
 import { prompts } from './prompts.js';
 import { generateWordId } from './wordId.js';
-import { getSubcardKey, getOrCreateSubcard, getBackModesForFront } from './fsrs.js';
+import { getSubcardKey, getOrCreateSubcard, getBackModesForFront, getAllSupercardsWithPedigree, previewCard } from './fsrs.js';
 
 function autoResizeTextarea(textarea) {
     if (!textarea) return;
@@ -871,4 +872,258 @@ export function forgetFSRS() {
     state.fsrsSubcards = {};
     saveState();
     renderFSRSStats();
+}
+
+// Back mode labels for display
+const BACK_MODE_LABEL = { 
+    hanzi: 'Hanzi', 
+    pronunciation: 'Pronunciation', 
+    meaning: 'Meaning', 
+    pinyin: 'Pinyin' 
+};
+
+/**
+ * Format pedigree reason for display
+ */
+function formatPedigree(pedigree) {
+    if (!pedigree) return '[Unknown]';
+    
+    switch (pedigree.reason) {
+        case 'New':
+            return '[New]';
+        case 'Practice':
+            const backModeLabel = pedigree.backMode ? BACK_MODE_LABEL[pedigree.backMode] || pedigree.backMode : 'Practice';
+            return `[${backModeLabel} Practice]`;
+        case 'Limbo':
+            return '[Limbo]';
+        case 'Variety':
+            return '[Variety]';
+        default:
+            return `[${pedigree.reason}]`;
+    }
+}
+
+/**
+ * View all supercards in selection order
+ */
+export function viewAllSupercards() {
+    const modal = $('#supercardsModal');
+    const container = $('#supercardsListContainer');
+    
+    if (!modal || !container) return;
+    
+    // Clear existing content
+    container.innerHTML = '';
+    
+    if (!state.wordlist || state.wordlist.length === 0) {
+        container.innerHTML = '<div style="padding: 20px; text-align: center; color: rgba(255,255,255,.5); font-weight: 650;">No words loaded. Import a wordlist to see supercards.</div>';
+        modal.style.display = 'flex';
+        return;
+    }
+    
+    // Get all supercards with pedigree
+    const supercards = getAllSupercardsWithPedigree(state.wordlist, state.fsrsSubcards, state.lastWordId);
+    
+    if (supercards.length === 0) {
+        container.innerHTML = '<div style="padding: 20px; text-align: center; color: rgba(255,255,255,.5); font-weight: 650;">No supercards available.</div>';
+        modal.style.display = 'flex';
+        return;
+    }
+    
+    // Render list items
+    supercards.forEach((supercard, index) => {
+        const item = document.createElement('div');
+        item.className = 'sentence-item';
+        item.style.cursor = 'pointer';
+        item.style.transition = 'background-color 0.2s';
+        
+        // Add hover effect
+        item.addEventListener('mouseenter', () => {
+            item.style.backgroundColor = 'rgba(255, 255, 255, .05)';
+        });
+        item.addEventListener('mouseleave', () => {
+            item.style.backgroundColor = '';
+        });
+        
+        // Click handler to show detail
+        item.addEventListener('click', () => {
+            showWordDetail(supercard.word, supercard.front, supercard);
+        });
+        
+        const wordText = supercard.word.word || '';
+        const frontLabel = FRONT_LABEL[supercard.front] || supercard.front;
+        const pedigreeText = formatPedigree(supercard.pedigree);
+        
+        item.innerHTML = `
+            <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
+                <div style="flex: 1;">
+                    <div style="font-weight: 700; font-size: 14px; margin-bottom: 4px;">
+                        ${index + 1}. ${wordText} (${frontLabel})
+                    </div>
+                    <div style="font-size: 12px; color: rgba(255,255,255,.6);">
+                        ${pedigreeText}
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        container.appendChild(item);
+    });
+    
+    // Show modal
+    modal.style.display = 'flex';
+}
+
+/**
+ * Show word detail popup with FSRS information
+ */
+export function showWordDetail(word, front, supercardData) {
+    const modal = $('#wordDetailModal');
+    const container = $('#wordDetailContainer');
+    const title = $('#wordDetailTitle');
+    
+    if (!modal || !container || !title) return;
+    
+    // Clear existing content
+    container.innerHTML = '';
+    
+    // Set title
+    title.textContent = `${word.word} (${FRONT_LABEL[front]})`;
+    
+    // Word information
+    const wordInfo = document.createElement('div');
+    wordInfo.style.marginBottom = '20px';
+    wordInfo.innerHTML = `
+        <div style="background: rgba(255,255,255,.04); border-radius: 8px; padding: 12px;">
+            <div style="font-size: 11px; color: rgba(255,255,255,.5); margin-bottom: 8px;">Word Information</div>
+            <div style="font-size: 16px; font-weight: 700; margin-bottom: 4px;">${word.word}</div>
+            <div style="font-size: 14px; color: rgba(255,255,255,.7); margin-bottom: 4px;">${word.pinyinToned || ''}</div>
+            <div style="font-size: 13px; color: rgba(255,255,255,.6);">${word.meaning || ''}</div>
+        </div>
+    `;
+    container.appendChild(wordInfo);
+    
+    // FSRS Information
+    const fsrsInfo = document.createElement('div');
+    fsrsInfo.style.marginBottom = '20px';
+    
+    const pedigreeText = formatPedigree(supercardData.pedigree);
+    const NEVER_SHOWN_DAYS = 9999; // Sentinel value from fsrs.js
+    const daysSinceShown = supercardData.daysSinceShown >= NEVER_SHOWN_DAYS ? 'Never' : `${supercardData.daysSinceShown.toFixed(1)} days`;
+    const urgencyScore = supercardData.urgencyScore.toFixed(2);
+    
+    fsrsInfo.innerHTML = `
+        <div style="background: rgba(255,255,255,.04); border-radius: 8px; padding: 12px;">
+            <div style="font-size: 11px; color: rgba(255,255,255,.5); margin-bottom: 8px;">FSRS Information</div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; font-size: 13px;">
+                <div>
+                    <div style="color: rgba(255,255,255,.5); margin-bottom: 2px;">Pedigree</div>
+                    <div style="font-weight: 650;">${pedigreeText}</div>
+                </div>
+                <div>
+                    <div style="color: rgba(255,255,255,.5); margin-bottom: 2px;">Days Since Shown</div>
+                    <div style="font-weight: 650;">${daysSinceShown}</div>
+                </div>
+                <div>
+                    <div style="color: rgba(255,255,255,.5); margin-bottom: 2px;">Urgency Score</div>
+                    <div style="font-weight: 650;">${urgencyScore}</div>
+                </div>
+                <div>
+                    <div style="color: rgba(255,255,255,.5); margin-bottom: 2px;">Status</div>
+                    <div style="font-weight: 650;">
+                        ${supercardData.isCompletelyNew ? 'New' : 'Review'}
+                        ${supercardData.hasOverdueSubcard ? ' (Overdue)' : ''}
+                        ${supercardData.isInLimbo ? ' (Limbo)' : ''}
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+    container.appendChild(fsrsInfo);
+    
+    // Subcards information
+    const subcardsInfo = document.createElement('div');
+    subcardsInfo.style.marginBottom = '20px';
+    
+    const backModes = getBackModesForFront(front);
+    const now = new Date();
+    const State = typeof FSRS !== 'undefined' ? FSRS.State : {
+        New: 0,
+        Learning: 1,
+        Review: 2,
+        Relearning: 3
+    };
+    
+    const stateNames = {
+        [State.New]: 'New',
+        [State.Learning]: 'Learning',
+        [State.Review]: 'Review',
+        [State.Relearning]: 'Relearning'
+    };
+    
+    let subcardsHTML = '<div style="font-size: 11px; color: rgba(255,255,255,.5); margin-bottom: 8px;">Subcards</div>';
+    
+    for (const backMode of backModes) {
+        const subcard = getOrCreateSubcard(word.id, front, backMode, state.fsrsSubcards);
+        const backModeLabel = BACK_MODE_LABEL[backMode] || backMode;
+        
+        if (!subcard || !subcard.last_review) {
+            subcardsHTML += `
+                <div style="background: rgba(255,255,255,.03); border-radius: 6px; padding: 10px; margin-bottom: 8px;">
+                    <div style="font-weight: 650; font-size: 13px; margin-bottom: 6px;">${backModeLabel}</div>
+                    <div style="font-size: 12px; color: rgba(255,255,255,.6);">State: New (Never reviewed)</div>
+                </div>
+            `;
+        } else {
+            const subcardState = subcard.state !== undefined ? subcard.state : State.New;
+            const stateName = stateNames[subcardState] || 'Unknown';
+            const dueDate = subcard.due ? new Date(subcard.due) : null;
+            const lastReview = subcard.last_review ? new Date(subcard.last_review) : null;
+            const dueText = dueDate ? (dueDate <= now ? `Overdue (${Math.floor((now - dueDate) / (1000 * 60 * 60 * 24))} days)` : `Due in ${Math.floor((dueDate - now) / (1000 * 60 * 60 * 24))} days`) : 'No due date';
+            const lastReviewText = lastReview ? lastReview.toLocaleDateString() : 'Never';
+            const stability = subcard.stability !== undefined ? subcard.stability.toFixed(2) : '—';
+            const difficulty = subcard.difficulty !== undefined ? subcard.difficulty.toFixed(2) : '—';
+            const interval = subcard.scheduled_days !== undefined ? `${subcard.scheduled_days.toFixed(1)} days` : '—';
+            
+            subcardsHTML += `
+                <div style="background: rgba(255,255,255,.03); border-radius: 6px; padding: 10px; margin-bottom: 8px;">
+                    <div style="font-weight: 650; font-size: 13px; margin-bottom: 6px;">${backModeLabel}</div>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 6px; font-size: 12px; color: rgba(255,255,255,.7);">
+                        <div><span style="color: rgba(255,255,255,.5);">State:</span> ${stateName}</div>
+                        <div><span style="color: rgba(255,255,255,.5);">Due:</span> ${dueText}</div>
+                        <div><span style="color: rgba(255,255,255,.5);">Stability:</span> ${stability}</div>
+                        <div><span style="color: rgba(255,255,255,.5);">Difficulty:</span> ${difficulty}</div>
+                        <div><span style="color: rgba(255,255,255,.5);">Interval:</span> ${interval}</div>
+                        <div><span style="color: rgba(255,255,255,.5);">Last Review:</span> ${lastReviewText}</div>
+                    </div>
+                </div>
+            `;
+        }
+    }
+    
+    subcardsInfo.innerHTML = `<div style="background: rgba(255,255,255,.04); border-radius: 8px; padding: 12px;">${subcardsHTML}</div>`;
+    container.appendChild(subcardsInfo);
+    
+    // Show modal
+    modal.style.display = 'flex';
+}
+
+/**
+ * Close supercards modal
+ */
+export function closeSupercardsModal() {
+    const modal = $('#supercardsModal');
+    if (modal) {
+        modal.style.display = 'none';
+    }
+}
+
+/**
+ * Close word detail modal
+ */
+export function closeWordDetailModal() {
+    const modal = $('#wordDetailModal');
+    if (modal) {
+        modal.style.display = 'none';
+    }
 }

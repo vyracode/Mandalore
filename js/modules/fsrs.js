@@ -545,10 +545,11 @@ function getOrderedSupercardCandidates(wordlist, fsrsSubcards, lastWordId, optio
             }
             
             // ANTI-LIMBO BOOST
+            // Use snapshot for limbo boost calculation (for deterministic ordering)
             const daysSinceShown = getDaysSinceLastShown(wordId, front, snapshotSupercardLastShown, now);
             let limboBoost = 0;
             let isInLimbo = false;
-            const neverShown = daysSinceShown >= NEVER_SHOWN_DAYS;
+            const neverShownForLimbo = daysSinceShown >= NEVER_SHOWN_DAYS;
             
             if (daysSinceShown >= LIMBO_BOOST_THRESHOLD_DAYS) {
                 const effectiveDays = Math.min(daysSinceShown, 365);
@@ -557,7 +558,7 @@ function getOrderedSupercardCandidates(wordlist, fsrsSubcards, lastWordId, optio
                     LIMBO_BOOST_MULTIPLIER * (1 + logFactor),
                     MAX_LIMBO_BOOST
                 );
-                if (neverShown) {
+                if (neverShownForLimbo) {
                     limboBoost = MAX_LIMBO_BOOST;
                 }
                 isInLimbo = true;
@@ -565,8 +566,15 @@ function getOrderedSupercardCandidates(wordlist, fsrsSubcards, lastWordId, optio
             
             urgencyScore += limboBoost;
             
+            // CRITICAL: Use LIVE state (not snapshot) to determine if card is new
+            // The snapshot is for deterministic ordering, but classification must use current state
+            // Otherwise, cards that were just completed won't be in the snapshot yet
+            const daysSinceShownLive = getDaysSinceLastShown(wordId, front, null, now);
+            const isNewCard = daysSinceShownLive >= NEVER_SHOWN_DAYS;
+            
             // Check if this is a new word (never seen any front for this wordId)
-            const isNewWord = !hasWordBeenSeen(wordId, snapshotSupercardLastShown);
+            // Also use live state for this
+            const isNewWord = !hasWordBeenSeen(wordId, null);
             
             allSupercards.push({
                 word,
@@ -577,14 +585,15 @@ function getOrderedSupercardCandidates(wordlist, fsrsSubcards, lastWordId, optio
                 hasDueSubcard,
                 isLastWord,
                 isInLimbo,
-                neverShown,
+                neverShown: neverShownForLimbo,
                 daysSinceShown,
                 isNewWord,
-                isNewCard: neverShown // New card = this specific supercard has never been shown
+                isNewCard // New card = this specific supercard has never been shown (using live state)
             });
             
             // Track counts for adaptive ratio (only count review cards, not new cards)
-            if (!isLastWord && !neverShown) {
+            // Use isNewCard (live state) instead of neverShown (snapshot state)
+            if (!isLastWord && !isNewCard) {
                 if (hasOverdueSubcard) overdueCount++;
                 if (hasDueSubcard) dueNowCount++;
             }
@@ -614,6 +623,11 @@ function getOrderedSupercardCandidates(wordlist, fsrsSubcards, lastWordId, optio
     // NEW REQUIREMENT: Show cards that have never been shown before (new cards) 
     // before cards that have been shown before (old cards)
     // Use isNewCard (neverShown) instead of isCompletelyNew (subcard reviews)
+    
+    // CRITICAL: Check if there are ANY new cards in the entire wordlist (not just cardsToConsider)
+    // This prevents showing old cards when the only new cards left are filtered out by isLastWord
+    const hasAnyNewCardsInWordlist = allSupercards.some(sc => sc.isNewCard);
+    
     const newPool = cardsToConsider.filter(sc => sc.isNewCard);
     const reviewPool = cardsToConsider.filter(sc => !sc.isNewCard);
     
@@ -635,10 +649,23 @@ function getOrderedSupercardCandidates(wordlist, fsrsSubcards, lastWordId, optio
         snapshotState.consecutiveNewCards : (state.consecutiveNewCards || 0);
     
     // PRIORITIZE NEW CARDS: Always show new cards before review cards
-    if (hasNewCards) {
-        selectedPool = newPool;
-        poolName = 'NEW';
+    // If there are ANY new cards in the wordlist (even if filtered out), we MUST show new cards
+    // Only show old cards if there are NO new cards left anywhere
+    if (hasAnyNewCardsInWordlist) {
+        // There are new cards somewhere - we must show new cards
+        if (hasNewCards) {
+            // We have new cards available (not filtered out) - use them
+            selectedPool = newPool;
+            poolName = 'NEW';
+        } else {
+            // All new cards are filtered out by isLastWord - include them anyway
+            // This ensures we never show old cards while new cards exist
+            const allNewCards = allSupercards.filter(sc => sc.isNewCard);
+            selectedPool = allNewCards;
+            poolName = 'NEW (forced - last word was new)';
+        }
     } else if (hasReviewCards) {
+        // No new cards anywhere - safe to show review cards
         selectedPool = reviewPool;
         poolName = 'REVIEW';
     } else {

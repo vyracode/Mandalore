@@ -128,6 +128,26 @@ function getDaysSinceLastShown(wordId, front, snapshotSupercardLastShown = null,
 }
 
 /**
+ * Check if a word has been seen before (any front mode)
+ * @param {string} wordId - The word's unique ID
+ * @param {Object} snapshotSupercardLastShown - Snapshot of supercardLastShown (optional, defaults to state)
+ * @returns {boolean} - True if any front mode for this word has been shown
+ */
+function hasWordBeenSeen(wordId, snapshotSupercardLastShown = null) {
+    const lastShownMap = snapshotSupercardLastShown || state.supercardLastShown;
+    if (!lastShownMap) return false;
+    
+    // Check if any front mode for this word has been shown
+    for (const front of FRONT_TYPES) {
+        const key = getSupercardKey(wordId, front);
+        if (lastShownMap[key]) {
+            return true;
+        }
+    }
+    return false;
+}
+
+/**
  * Initialize FSRS instance with default parameters
  */
 let fsrsInstance = null;
@@ -545,6 +565,9 @@ function getOrderedSupercardCandidates(wordlist, fsrsSubcards, lastWordId, optio
             
             urgencyScore += limboBoost;
             
+            // Check if this is a new word (never seen any front for this wordId)
+            const isNewWord = !hasWordBeenSeen(wordId, snapshotSupercardLastShown);
+            
             allSupercards.push({
                 word,
                 front,
@@ -555,7 +578,9 @@ function getOrderedSupercardCandidates(wordlist, fsrsSubcards, lastWordId, optio
                 isLastWord,
                 isInLimbo,
                 neverShown,
-                daysSinceShown
+                daysSinceShown,
+                isNewWord,
+                isNewCard: neverShown // New card = this specific supercard has never been shown
             });
             
             // Track counts for adaptive ratio
@@ -589,10 +614,11 @@ function getOrderedSupercardCandidates(wordlist, fsrsSubcards, lastWordId, optio
     const newPool = cardsToConsider.filter(sc => sc.isCompletelyNew);
     const reviewPool = cardsToConsider.filter(sc => !sc.isCompletelyNew);
     
-    // Calculate adaptive mixing ratio
+    // Calculate adaptive mixing ratio (not used anymore, but kept for compatibility)
     const newCardRatio = getAdaptiveNewCardRatio(msSinceLastReview, overdueCount, dueNowCount);
     
-    // Decide which pool to draw from (use randomFn for deterministic selection)
+    // Decide which pool to draw from
+    // NEW REQUIREMENT: Show all new cards before any review cards
     let selectedPool;
     let poolName;
     
@@ -605,32 +631,13 @@ function getOrderedSupercardCandidates(wordlist, fsrsSubcards, lastWordId, optio
     const consecutiveNewCards = snapshotState.consecutiveNewCards !== undefined ? 
         snapshotState.consecutiveNewCards : (state.consecutiveNewCards || 0);
     
-    if (hasNewCards && hasReviewCards) {
-        const showNew = randomFn() < newCardRatio;
-        
-        if (showNew) {
-            if (consecutiveNewCards >= MAX_CONSECUTIVE_NEW_CARDS && hasReviewCards) {
-                selectedPool = reviewPool;
-                poolName = 'REVIEW (anti-limbo forced)';
-            } else {
-                selectedPool = newPool;
-                poolName = 'NEW';
-            }
-        } else {
-            if (consecutiveDueCards >= MAX_CONSECUTIVE_SAME_POOL && hasNewCards) {
-                selectedPool = newPool;
-                poolName = 'NEW (anti-limbo forced)';
-            } else {
-                selectedPool = reviewPool;
-                poolName = 'REVIEW';
-            }
-        }
-    } else if (hasNewCards) {
+    // PRIORITIZE NEW CARDS: Always show new cards before review cards
+    if (hasNewCards) {
         selectedPool = newPool;
-        poolName = 'NEW (only option)';
+        poolName = 'NEW';
     } else if (hasReviewCards) {
         selectedPool = reviewPool;
-        poolName = 'REVIEW (only option)';
+        poolName = 'REVIEW';
     } else {
         selectedPool = cardsToConsider;
         poolName = 'FALLBACK (all cards)';
@@ -672,9 +679,8 @@ function getOrderedSupercardCandidates(wordlist, fsrsSubcards, lastWordId, optio
         });
     };
     
-    // Build ordered candidates list by INTERLEAVING new and review cards
-    // This reflects the actual selection behavior (mixing based on ratio)
-    // Rather than putting one pool entirely before the other
+    // Build ordered candidates list
+    // NEW REQUIREMENT: Put all new cards first, then all review cards
     const orderedCandidates = [];
     
     // Add tie-breakers to both pools and sort them
@@ -686,34 +692,9 @@ function getOrderedSupercardCandidates(wordlist, fsrsSubcards, lastWordId, optio
     sortPool(sortedNewPool);
     sortPool(sortedReviewPool);
     
-    // Interleave based on the new card ratio
-    // If ratio is 0.3, roughly 1 in 3-4 cards should be new
-    let newIdx = 0;
-    let reviewIdx = 0;
-    let cardsSinceNew = 0;
-    const effectiveRatio = Math.max(0.1, Math.min(0.5, newCardRatio)); // Clamp ratio
-    const insertInterval = Math.round(1 / effectiveRatio); // How often to insert a new card
-    
-    while (newIdx < sortedNewPool.length || reviewIdx < sortedReviewPool.length) {
-        // Decide whether to insert a new card or review card
-        const shouldInsertNew = sortedNewPool.length > 0 && newIdx < sortedNewPool.length && (
-            sortedReviewPool.length === 0 || 
-            reviewIdx >= sortedReviewPool.length ||
-            cardsSinceNew >= insertInterval - 1
-        );
-        
-        if (shouldInsertNew) {
-            orderedCandidates.push(sortedNewPool[newIdx]);
-            newIdx++;
-            cardsSinceNew = 0;
-        } else if (reviewIdx < sortedReviewPool.length) {
-            orderedCandidates.push(sortedReviewPool[reviewIdx]);
-            reviewIdx++;
-            cardsSinceNew++;
-        } else {
-            break;
-        }
-    }
+    // Add all new cards first, then all review cards
+    orderedCandidates.push(...sortedNewPool);
+    orderedCandidates.push(...sortedReviewPool);
     
     // Select card if requested - always pick the first card in the interleaved order
     // This ensures the settings menu ordering matches actual selection
@@ -809,7 +790,9 @@ export function getNextSupercard(wordlist, fsrsSubcards, lastWordId = '') {
     return {
         word: selected.word,
         front: selected.front,
-        poolName: result.poolName // Pass pool name for deferred counter updates
+        poolName: result.poolName, // Pass pool name for deferred counter updates
+        isNewCard: selected.isNewCard || false, // Whether this specific supercard is new
+        isNewWord: selected.isNewWord || false  // Whether this word has never been seen in any front
     };
 }
 
@@ -935,7 +918,12 @@ export function getAllSupercardsWithPedigree(wordlist, fsrsSubcards, lastWordId 
         // Determine pedigree reason
         let pedigree;
         if (supercard.isCompletelyNew) {
-            pedigree = { reason: 'New' };
+            // Distinguish between new word and new card
+            if (supercard.isNewWord) {
+                pedigree = { reason: 'New Word' };
+            } else {
+                pedigree = { reason: 'New Card' };
+            }
         } else if (supercard.hasOverdueSubcard || supercard.hasDueSubcard) {
             pedigree = { reason: 'Practice', backMode: mostUrgentBackMode };
         } else if (supercard.isInLimbo) {

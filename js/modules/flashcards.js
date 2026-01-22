@@ -229,6 +229,8 @@ export function nextCard() {
         console.log('Empty wordlist, showing empty state');
         state.card.word = null;
         state.card.id = '';
+        state.card.isNewCard = false;
+        state.card.isNewWord = false;
         state.lastWordId = '';
         renderFront();
         resetAllBack();
@@ -263,6 +265,8 @@ export function nextCard() {
         state.card.tones = item.tones;
         state.card.meaning = item.meaning;
         state.card.front = front;
+        state.card.isNewCard = false; // Fallback doesn't track new status
+        state.card.isNewWord = false;
         
         // Set fallback pool name (don't update lastWordId until completion)
         currentCardPoolName = 'FALLBACK';
@@ -284,6 +288,8 @@ export function nextCard() {
         state.card.tones = item.tones;
         state.card.meaning = item.meaning;
         state.card.front = front;
+        state.card.isNewCard = next.isNewCard || false;
+        state.card.isNewWord = next.isNewWord || false;
         
         // Store pool name for deferred commit (don't update lastWordId until completion)
         currentCardPoolName = next.poolName;
@@ -291,7 +297,9 @@ export function nextCard() {
         console.log('Selected FSRS card:', {
             wordId: state.card.id,
             word: state.card.word,
-            front: state.card.front
+            front: state.card.front,
+            isNewCard: state.card.isNewCard,
+            isNewWord: state.card.isNewWord
         });
         
         const backModes = getBackModesForFront(front);
@@ -397,6 +405,29 @@ export function renderFront() {
     if (dot) {
         const c = { hanzi: 'var(--cyan)', pronunciation: 'var(--green)', pinyin: 'var(--purple)', meaning: 'var(--orange)' }[f];
         dot.style.background = c;
+    }
+    
+    // Add new card/new word tags next to the front badge
+    const frontBadge = $('#frontBadge');
+    if (frontBadge) {
+        // Remove any existing new tags
+        const existingTags = frontBadge.querySelectorAll('.new-tag');
+        existingTags.forEach(tag => tag.remove());
+        
+        // Add new word tag if applicable (takes priority over new card)
+        if (state.card.isNewWord) {
+            const newWordTag = document.createElement('span');
+            newWordTag.className = 'new-tag';
+            newWordTag.textContent = 'New Word';
+            newWordTag.style.cssText = 'margin-left: 8px; font-size: 11px; padding: 2px 6px; background: rgba(40, 216, 255, 0.2); color: var(--cyan); border-radius: 4px; font-weight: 600;';
+            frontBadge.appendChild(newWordTag);
+        } else if (state.card.isNewCard) {
+            const newCardTag = document.createElement('span');
+            newCardTag.className = 'new-tag';
+            newCardTag.textContent = 'New Card';
+            newCardTag.style.cssText = 'margin-left: 8px; font-size: 11px; padding: 2px 6px; background: rgba(122, 92, 255, 0.2); color: var(--purple); border-radius: 4px; font-weight: 600;';
+            frontBadge.appendChild(newCardTag);
+        }
     }
     
     updateDailySupercardCounter();

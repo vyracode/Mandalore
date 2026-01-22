@@ -11,6 +11,8 @@ export const state = {
         tones: '',
         meaning: '',
         audioLabel: 'Pronunciation',
+        isNewCard: false, // Whether this specific supercard (wordId + front) is new
+        isNewWord: false, // Whether this word has never been seen in any front mode
     },
     wordlist: [], // { id, word, pinyinToned, meaning, pinyinBare, tones }
     translation: {

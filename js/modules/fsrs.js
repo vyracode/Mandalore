@@ -583,8 +583,8 @@ function getOrderedSupercardCandidates(wordlist, fsrsSubcards, lastWordId, optio
                 isNewCard: neverShown // New card = this specific supercard has never been shown
             });
             
-            // Track counts for adaptive ratio
-            if (!isLastWord && !allSubcardsNew) {
+            // Track counts for adaptive ratio (only count review cards, not new cards)
+            if (!isLastWord && !neverShown) {
                 if (hasOverdueSubcard) overdueCount++;
                 if (hasDueSubcard) dueNowCount++;
             }
@@ -611,8 +611,11 @@ function getOrderedSupercardCandidates(wordlist, fsrsSubcards, lastWordId, optio
     }
     
     // POOL CLASSIFICATION
-    const newPool = cardsToConsider.filter(sc => sc.isCompletelyNew);
-    const reviewPool = cardsToConsider.filter(sc => !sc.isCompletelyNew);
+    // NEW REQUIREMENT: Show cards that have never been shown before (new cards) 
+    // before cards that have been shown before (old cards)
+    // Use isNewCard (neverShown) instead of isCompletelyNew (subcard reviews)
+    const newPool = cardsToConsider.filter(sc => sc.isNewCard);
+    const reviewPool = cardsToConsider.filter(sc => !sc.isNewCard);
     
     // Calculate adaptive mixing ratio (not used anymore, but kept for compatibility)
     const newCardRatio = getAdaptiveNewCardRatio(msSinceLastReview, overdueCount, dueNowCount);

@@ -64,7 +64,8 @@ export function saveState() {
             dailySupercardDate: state.dailySupercardDate,
             consecutiveDueCards: state.consecutiveDueCards || 0,
             consecutiveNewCards: state.consecutiveNewCards || 0,
-            supercardLastShown: state.supercardLastShown || {}
+            supercardLastShown: state.supercardLastShown || {},
+            lastWordId: state.lastWordId || ''
         };
         localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
     } catch (e) {
@@ -127,6 +128,13 @@ export function loadState() {
             state.supercardLastShown = data.supercardLastShown;
         } else {
             state.supercardLastShown = {};
+        }
+        
+        // Load last word ID (for deterministic seeding and avoiding repetition)
+        if (typeof data.lastWordId === 'string') {
+            state.lastWordId = data.lastWordId;
+        } else {
+            state.lastWordId = '';
         }
         
         // Reset counter if it's a new day

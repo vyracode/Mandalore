@@ -36,7 +36,8 @@ export const state = {
     dailySupercardDate: null, // Date string (YYYY-MM-DD) for the day this count is for
     consecutiveDueCards: 0, // Track consecutive review card picks to ensure new cards are shown
     consecutiveNewCards: 0, // Track consecutive new card picks to ensure review cards are shown
-    supercardLastShown: {} // Map of supercardKey (wordId_front) -> ISO timestamp of last shown
+    supercardLastShown: {}, // Map of supercardKey (wordId_front) -> ISO timestamp of last shown
+    selectionReferenceTime: null // ISO timestamp used for deterministic scoring (cleared on completion)
 };
 
 const STORAGE_KEY = 'mandalore_state_v1';
@@ -65,7 +66,8 @@ export function saveState() {
             consecutiveDueCards: state.consecutiveDueCards || 0,
             consecutiveNewCards: state.consecutiveNewCards || 0,
             supercardLastShown: state.supercardLastShown || {},
-            lastWordId: state.lastWordId || ''
+            lastWordId: state.lastWordId || '',
+            selectionReferenceTime: state.selectionReferenceTime || null
         };
         localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
     } catch (e) {
@@ -135,6 +137,13 @@ export function loadState() {
             state.lastWordId = data.lastWordId;
         } else {
             state.lastWordId = '';
+        }
+        
+        // Load selection reference time (for deterministic scoring on refresh)
+        if (typeof data.selectionReferenceTime === 'string') {
+            state.selectionReferenceTime = data.selectionReferenceTime;
+        } else {
+            state.selectionReferenceTime = null;
         }
         
         // Reset counter if it's a new day

@@ -236,14 +236,15 @@ export function recordReview(card, now = new Date(), rating) {
 /**
  * Calculate how long since the most recent review across all subcards
  * @param {Object} fsrsSubcards - Map of FSRS subcards
+ * @param {Date} snapshotNow - Reference time for calculation (for determinism)
  * @returns {number} - Milliseconds since last review, or Infinity if never reviewed
  */
-function getTimeSinceLastReview(fsrsSubcards) {
+function getTimeSinceLastReview(fsrsSubcards, snapshotNow = null) {
     if (!fsrsSubcards || Object.keys(fsrsSubcards).length === 0) {
         return Infinity;
     }
     
-    const now = new Date();
+    const now = snapshotNow || new Date();
     let mostRecentReview = null;
     
     for (const card of Object.values(fsrsSubcards)) {
@@ -465,7 +466,7 @@ function getOrderedSupercardCandidates(wordlist, fsrsSubcards, lastWordId, optio
     const now = snapshotNow || new Date();
     
     // Calculate time since last practice for adaptive mixing
-    const msSinceLastReview = getTimeSinceLastReview(fsrsSubcards);
+    const msSinceLastReview = getTimeSinceLastReview(fsrsSubcards, now);
     
     // Collect all supercards with their scores
     const allSupercards = [];
@@ -635,20 +636,6 @@ function getOrderedSupercardCandidates(wordlist, fsrsSubcards, lastWordId, optio
         poolName = 'FALLBACK (all cards)';
     }
     
-    // Apply variety check if enabled
-    let varietyFilteredPool = selectedPool;
-    if (applyVarietyCheck) {
-        const VARIETY_INTERVAL = 15;
-        const totalCardsShown = snapshotState.dailySupercardCount !== undefined ? 
-            snapshotState.dailySupercardCount : (state.dailySupercardCount || 0);
-        if (totalCardsShown > 0 && totalCardsShown % VARIETY_INTERVAL === 0) {
-            const lessRecentCards = selectedPool.filter(sc => sc.daysSinceShown >= 1);
-            if (lessRecentCards.length > 0) {
-                varietyFilteredPool = lessRecentCards;
-            }
-        }
-    }
-    
     // Pre-compute deterministic tie-breaker values for all supercards before sorting
     // This ensures deterministic sorting regardless of comparison order
     const addTieBreakers = (pool) => {
@@ -685,31 +672,54 @@ function getOrderedSupercardCandidates(wordlist, fsrsSubcards, lastWordId, optio
         });
     };
     
-    // Add tie-breakers before sorting (ensures deterministic order)
-    addTieBreakers(varietyFilteredPool);
+    // Build ordered candidates list by INTERLEAVING new and review cards
+    // This reflects the actual selection behavior (mixing based on ratio)
+    // Rather than putting one pool entirely before the other
+    const orderedCandidates = [];
     
-    // Sort the selected pool (for selection and ordering)
-    sortPool(varietyFilteredPool);
+    // Add tie-breakers to both pools and sort them
+    addTieBreakers(newPool);
+    addTieBreakers(reviewPool);
     
-    // Sort the other pool as well (for complete ordering)
-    const otherPool = selectedPool === newPool ? reviewPool : newPool;
-    if (otherPool.length > 0) {
-        addTieBreakers(otherPool);
-        sortPool(otherPool);
+    const sortedNewPool = newPool.slice();
+    const sortedReviewPool = reviewPool.slice();
+    sortPool(sortedNewPool);
+    sortPool(sortedReviewPool);
+    
+    // Interleave based on the new card ratio
+    // If ratio is 0.3, roughly 1 in 3-4 cards should be new
+    let newIdx = 0;
+    let reviewIdx = 0;
+    let cardsSinceNew = 0;
+    const effectiveRatio = Math.max(0.1, Math.min(0.5, newCardRatio)); // Clamp ratio
+    const insertInterval = Math.round(1 / effectiveRatio); // How often to insert a new card
+    
+    while (newIdx < sortedNewPool.length || reviewIdx < sortedReviewPool.length) {
+        // Decide whether to insert a new card or review card
+        const shouldInsertNew = sortedNewPool.length > 0 && newIdx < sortedNewPool.length && (
+            sortedReviewPool.length === 0 || 
+            reviewIdx >= sortedReviewPool.length ||
+            cardsSinceNew >= insertInterval - 1
+        );
+        
+        if (shouldInsertNew) {
+            orderedCandidates.push(sortedNewPool[newIdx]);
+            newIdx++;
+            cardsSinceNew = 0;
+        } else if (reviewIdx < sortedReviewPool.length) {
+            orderedCandidates.push(sortedReviewPool[reviewIdx]);
+            reviewIdx++;
+            cardsSinceNew++;
+        } else {
+            break;
+        }
     }
     
-    // Build ordered candidates list: selected pool first, then other pool
-    // This ensures the order matches what would actually be selected
-    const orderedCandidates = [...varietyFilteredPool];
-    if (otherPool.length > 0 && selectedPool !== otherPool) {
-        orderedCandidates.push(...otherPool);
-    }
-    
-    // Select card if requested - always pick the first card in the sorted pool
+    // Select card if requested - always pick the first card in the interleaved order
     // This ensures the settings menu ordering matches actual selection
     let selectedCard = null;
-    if (selectCard && varietyFilteredPool.length > 0) {
-        selectedCard = varietyFilteredPool[0];
+    if (selectCard && orderedCandidates.length > 0) {
+        selectedCard = orderedCandidates[0];
     }
     
     return {
@@ -756,10 +766,19 @@ export function getNextSupercard(wordlist, fsrsSubcards, lastWordId = '') {
         consecutiveNewCards: state.consecutiveNewCards || 0
     };
     
-    // Snapshot supercardLastShown and current time to ensure consistent ordering
-    // This prevents ordering differences if getAllSupercardsWithPedigree is called after
+    // Snapshot supercardLastShown to ensure consistent ordering
     const snapshotSupercardLastShown = state.supercardLastShown ? { ...state.supercardLastShown } : {};
-    const snapshotNow = new Date();
+    
+    // Use persisted reference time for deterministic scoring on refresh
+    // If not set, create a new one and persist it
+    let snapshotNow;
+    if (state.selectionReferenceTime) {
+        snapshotNow = new Date(state.selectionReferenceTime);
+    } else {
+        snapshotNow = new Date();
+        state.selectionReferenceTime = snapshotNow.toISOString();
+        saveState();
+    }
     
     // Generate deterministic seed from card states (ensures same states = same selection)
     const baseSeed = generateDeterministicSeed(fsrsSubcards);
@@ -837,6 +856,9 @@ export function commitSupercardSelection(wordId, front, poolName) {
     // Update lastWordId to track this as the last completed word
     state.lastWordId = wordId;
     
+    // Clear selection reference time so next selection uses fresh time
+    state.selectionReferenceTime = null;
+    
     saveState();
 }
 
@@ -862,10 +884,14 @@ export function getAllSupercardsWithPedigree(wordlist, fsrsSubcards, lastWordId 
         consecutiveNewCards: state.consecutiveNewCards || 0
     };
     
-    // Snapshot supercardLastShown and current time to ensure consistent ordering
-    // This ensures the ordering matches what getNextSupercard would produce
+    // Snapshot supercardLastShown to ensure consistent ordering
     const snapshotSupercardLastShown = state.supercardLastShown ? { ...state.supercardLastShown } : {};
-    const snapshotNow = new Date();
+    
+    // Use persisted reference time for deterministic scoring (same as getNextSupercard)
+    // If not set, use current time (this shouldn't happen if getNextSupercard was called first)
+    const snapshotNow = state.selectionReferenceTime 
+        ? new Date(state.selectionReferenceTime) 
+        : new Date();
     
     // Generate deterministic seed from card states (ensures same states = same selection)
     const baseSeed = generateDeterministicSeed(fsrsSubcards);
@@ -885,8 +911,7 @@ export function getAllSupercardsWithPedigree(wordlist, fsrsSubcards, lastWordId 
     
     const orderedCandidates = result.orderedCandidates || [];
     
-    // Add pedigree information to each supercard
-    const now = new Date();
+    // Add pedigree information to each supercard (using snapshotNow for consistency)
     const supercardsWithPedigree = orderedCandidates.map((supercard, index) => {
         const { word, front } = supercard;
         const wordId = word.id;
@@ -900,7 +925,7 @@ export function getAllSupercardsWithPedigree(wordlist, fsrsSubcards, lastWordId 
             const subcard = getOrCreateSubcard(wordId, front, backMode, fsrsSubcards);
             if (!subcard) continue;
             
-            const scoreResult = getRelativeOverdueScore(subcard, now);
+            const scoreResult = getRelativeOverdueScore(subcard, snapshotNow);
             if (!scoreResult.isNew && scoreResult.score > bestReviewScore) {
                 bestReviewScore = scoreResult.score;
                 mostUrgentBackMode = backMode;

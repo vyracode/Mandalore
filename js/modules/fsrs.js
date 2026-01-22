@@ -108,11 +108,14 @@ export function recordSupercardShown(wordId, front) {
  * Get days since a supercard was last shown
  * @param {string} wordId - The word's unique ID
  * @param {string} front - The front modality type
+ * @param {Object} snapshotSupercardLastShown - Snapshot of supercardLastShown (optional, defaults to state)
+ * @param {Date} snapshotNow - Snapshot of current time (optional, defaults to new Date())
  * @returns {number} - Days since last shown, or NEVER_SHOWN_DAYS if never shown
  */
-function getDaysSinceLastShown(wordId, front) {
+function getDaysSinceLastShown(wordId, front, snapshotSupercardLastShown = null, snapshotNow = null) {
     const key = getSupercardKey(wordId, front);
-    const lastShown = state.supercardLastShown?.[key];
+    const lastShownMap = snapshotSupercardLastShown || state.supercardLastShown;
+    const lastShown = lastShownMap?.[key];
     if (!lastShown) {
         return NEVER_SHOWN_DAYS; // Never shown - use sentinel value instead of Infinity to avoid math issues
     }
@@ -120,7 +123,7 @@ function getDaysSinceLastShown(wordId, front) {
     if (isNaN(lastShownDate.getTime())) {
         return NEVER_SHOWN_DAYS; // Invalid date - treat as never shown
     }
-    const now = new Date();
+    const now = snapshotNow || new Date();
     return Math.max(0, (now - lastShownDate) / MS_PER_DAY);
 }
 
@@ -384,12 +387,14 @@ function createSeededRNG(seed) {
 }
 
 /**
- * Generate deterministic seed from current state
- * @param {Object} state - Application state object
- * @param {string} lastWordId - Last word ID shown
+ * Generate deterministic seed from card states
+ * Hashes the fsrsSubcards to create a seed that changes when card states change
+ * Same card states = same seed = same selection
+ * Different card states = different seed = different selection
+ * @param {Object} fsrsSubcards - Map of FSRS subcards
  * @returns {number} - Integer seed value
  */
-function generateDeterministicSeed(state, lastWordId) {
+function generateDeterministicSeed(fsrsSubcards) {
     const hash = (str) => {
         let hash = 0;
         for (let i = 0; i < str.length; i++) {
@@ -400,14 +405,31 @@ function generateDeterministicSeed(state, lastWordId) {
         return Math.abs(hash);
     };
     
-    const seedString = [
-        state.dailySupercardCount || 0,
-        state.consecutiveDueCards || 0,
-        state.consecutiveNewCards || 0,
-        lastWordId || ''
-    ].join('-');
+    // Create a deterministic string representation of card states
+    // Sort keys for consistent ordering, then hash the serialized state
+    const keys = Object.keys(fsrsSubcards || {}).sort();
+    const stateStrings = keys.map(key => {
+        const card = fsrsSubcards[key];
+        if (!card) return '';
+        
+        // Include relevant state properties that affect selection
+        // Use ISO strings for dates to ensure consistency
+        const dueStr = card.due ? new Date(card.due).toISOString() : 'null';
+        const lastReviewStr = card.last_review ? new Date(card.last_review).toISOString() : 'null';
+        const state = card.state !== undefined ? String(card.state) : 'new';
+        const stability = card.stability !== undefined ? String(card.stability) : '0';
+        
+        return `${key}:${dueStr}:${lastReviewStr}:${state}:${stability}`;
+    });
     
-    return hash(seedString);
+    const combinedString = stateStrings.join('|');
+    
+    // If no cards, use a default seed
+    if (!combinedString) {
+        return 12345;
+    }
+    
+    return hash(combinedString);
 }
 
 /**
@@ -429,14 +451,18 @@ function getOrderedSupercardCandidates(wordlist, fsrsSubcards, lastWordId, optio
         randomFn = Math.random,
         applyVarietyCheck = true,
         snapshotState = {},
-        selectCard = true
+        selectCard = true,
+        snapshotNow = null,
+        snapshotSupercardLastShown = null
     } = options;
     
     if (!wordlist || wordlist.length === 0) {
         return { selectedCard: null, orderedCandidates: [], poolName: null };
     }
     
-    const now = new Date();
+    // Use snapshot time if provided, otherwise use current time
+    // This ensures consistent ordering when called from different contexts
+    const now = snapshotNow || new Date();
     
     // Calculate time since last practice for adaptive mixing
     const msSinceLastReview = getTimeSinceLastReview(fsrsSubcards);
@@ -498,7 +524,7 @@ function getOrderedSupercardCandidates(wordlist, fsrsSubcards, lastWordId, optio
             }
             
             // ANTI-LIMBO BOOST
-            const daysSinceShown = getDaysSinceLastShown(wordId, front);
+            const daysSinceShown = getDaysSinceLastShown(wordId, front, snapshotSupercardLastShown, now);
             let limboBoost = 0;
             let isInLimbo = false;
             const neverShown = daysSinceShown >= NEVER_SHOWN_DAYS;
@@ -623,6 +649,16 @@ function getOrderedSupercardCandidates(wordlist, fsrsSubcards, lastWordId, optio
         }
     }
     
+    // Pre-compute deterministic tie-breaker values for all supercards before sorting
+    // This ensures deterministic sorting regardless of comparison order
+    const addTieBreakers = (pool) => {
+        pool.forEach(sc => {
+            if (sc._tieBreaker === undefined) {
+                sc._tieBreaker = randomFn();
+            }
+        });
+    };
+    
     // Sort both pools for ordering
     const sortPool = (pool) => {
         pool.sort((a, b) => {
@@ -644,10 +680,13 @@ function getOrderedSupercardCandidates(wordlist, fsrsSubcards, lastWordId, optio
             const hashB = (b.word.id || '').charCodeAt(0) + b.front.charCodeAt(0);
             if (hashA !== hashB) return hashA - hashB;
             
-            // PRIORITY 4: Random tie-breaker (uses randomFn)
-            return randomFn() - 0.5;
+            // PRIORITY 4: Pre-computed deterministic tie-breaker
+            return (a._tieBreaker || 0) - (b._tieBreaker || 0);
         });
     };
+    
+    // Add tie-breakers before sorting (ensures deterministic order)
+    addTieBreakers(varietyFilteredPool);
     
     // Sort the selected pool (for selection and ordering)
     sortPool(varietyFilteredPool);
@@ -655,6 +694,7 @@ function getOrderedSupercardCandidates(wordlist, fsrsSubcards, lastWordId, optio
     // Sort the other pool as well (for complete ordering)
     const otherPool = selectedPool === newPool ? reviewPool : newPool;
     if (otherPool.length > 0) {
+        addTieBreakers(otherPool);
         sortPool(otherPool);
     }
     
@@ -665,25 +705,11 @@ function getOrderedSupercardCandidates(wordlist, fsrsSubcards, lastWordId, optio
         orderedCandidates.push(...otherPool);
     }
     
-    // Select card if requested
+    // Select card if requested - always pick the first card in the sorted pool
+    // This ensures the settings menu ordering matches actual selection
     let selectedCard = null;
     if (selectCard && varietyFilteredPool.length > 0) {
-        const topCount = Math.min(5, Math.max(2, Math.ceil(varietyFilteredPool.length * 0.3)));
-        const topCandidates = varietyFilteredPool.slice(0, topCount);
-        
-        // Group by word
-        const byWord = {};
-        topCandidates.forEach(sc => {
-            const wid = sc.word.id;
-            if (!byWord[wid]) byWord[wid] = [];
-            byWord[wid].push(sc);
-        });
-        
-        // Pick random word, then random front
-        const wordIds = Object.keys(byWord);
-        const randomWordId = wordIds[Math.floor(randomFn() * wordIds.length)];
-        const cardsForWord = byWord[randomWordId];
-        selectedCard = cardsForWord[Math.floor(randomFn() * cardsForWord.length)];
+        selectedCard = varietyFilteredPool[0];
     }
     
     return {
@@ -722,32 +748,71 @@ export function getNextSupercard(wordlist, fsrsSubcards, lastWordId = '') {
         state.consecutiveNewCards = 0;
     }
     
-    // Get ordered candidates using Math.random (non-deterministic for actual selection)
+    // Capture state values BEFORE selection (these will be used for seed and selection logic)
+    // This ensures deterministic behavior - same state = same seed = same selection
+    const snapshotState = {
+        dailySupercardCount: state.dailySupercardCount || 0,
+        consecutiveDueCards: state.consecutiveDueCards || 0,
+        consecutiveNewCards: state.consecutiveNewCards || 0
+    };
+    
+    // Snapshot supercardLastShown and current time to ensure consistent ordering
+    // This prevents ordering differences if getAllSupercardsWithPedigree is called after
+    const snapshotSupercardLastShown = state.supercardLastShown ? { ...state.supercardLastShown } : {};
+    const snapshotNow = new Date();
+    
+    // Generate deterministic seed from card states (ensures same states = same selection)
+    const baseSeed = generateDeterministicSeed(fsrsSubcards);
+    
+    // Create seeded RNG for deterministic selection
+    const seededRNG = createSeededRNG(baseSeed);
+    
+    // Get ordered candidates using seeded RNG (deterministic)
     const result = getOrderedSupercardCandidates(wordlist, fsrsSubcards, lastWordId, {
-        randomFn: Math.random,
+        randomFn: seededRNG.random.bind(seededRNG),
         applyVarietyCheck: true,
-        snapshotState: {
-            dailySupercardCount: state.dailySupercardCount,
-            consecutiveDueCards: state.consecutiveDueCards,
-            consecutiveNewCards: state.consecutiveNewCards
-        },
-        selectCard: true
+        snapshotState: snapshotState,
+        selectCard: true,
+        snapshotNow: snapshotNow,
+        snapshotSupercardLastShown: snapshotSupercardLastShown
     });
     
     if (!result.selectedCard) {
         return null;
     }
     
-    // Update consecutive counters based on which pool was selected
+    // NOTE: State updates (counters, supercardLastShown) are now deferred to COMPLETION time
+    // This ensures deterministic selection on refresh - same state = same selection
+    // Updates are handled by commitSupercardSelection() called from flashcards.js
+    
     const selected = result.selectedCard;
-    const wasNewPool = result.poolName && result.poolName.startsWith('NEW');
+    
+    return {
+        word: selected.word,
+        front: selected.front,
+        poolName: result.poolName // Pass pool name for deferred counter updates
+    };
+}
+
+/**
+ * Commit supercard selection - updates state after card is COMPLETED
+ * This defers state updates from selection time to completion time,
+ * ensuring deterministic selection on refresh (same state = same selection)
+ * 
+ * @param {string} wordId - The word's unique ID
+ * @param {string} front - The front modality type
+ * @param {string} poolName - The pool name from getNextSupercard result
+ */
+export function commitSupercardSelection(wordId, front, poolName) {
+    // Update consecutive counters based on which pool was selected
+    const wasNewPool = poolName && poolName.startsWith('NEW');
     
     if (wasNewPool) {
         state.consecutiveNewCards++;
         state.consecutiveDueCards = 0;
         
         // Check for anti-limbo forcing
-        if (result.poolName === 'REVIEW (anti-limbo forced)') {
+        if (poolName === 'REVIEW (anti-limbo forced)') {
             state.consecutiveNewCards = 0;
         }
     } else {
@@ -755,26 +820,24 @@ export function getNextSupercard(wordlist, fsrsSubcards, lastWordId = '') {
         state.consecutiveNewCards = 0;
         
         // Check for anti-limbo forcing
-        if (result.poolName === 'NEW (anti-limbo forced)') {
+        if (poolName === 'NEW (anti-limbo forced)') {
             state.consecutiveDueCards = 0;
         }
     }
     
     // Reset counters if only one pool available
-    if (result.poolName && (result.poolName.includes('only option') || result.poolName === 'FALLBACK')) {
+    if (poolName && (poolName.includes('only option') || poolName === 'FALLBACK')) {
         state.consecutiveDueCards = 0;
         state.consecutiveNewCards = 0;
     }
     
+    // Record that this supercard was shown (for anti-limbo tracking)
+    recordSupercardShown(wordId, front);
+    
+    // Update lastWordId to track this as the last completed word
+    state.lastWordId = wordId;
+    
     saveState();
-    
-    // Record that this supercard is being shown (for anti-limbo tracking)
-    recordSupercardShown(selected.word.id, selected.front);
-    
-    return {
-        word: selected.word,
-        front: selected.front
-    };
 }
 
 /**
@@ -792,8 +855,20 @@ export function getAllSupercardsWithPedigree(wordlist, fsrsSubcards, lastWordId 
         return [];
     }
     
-    // Generate deterministic seed from current state
-    const baseSeed = generateDeterministicSeed(state, lastWordId);
+    // Capture state values for deterministic seed (same as getNextSupercard)
+    const snapshotState = {
+        dailySupercardCount: state.dailySupercardCount || 0,
+        consecutiveDueCards: state.consecutiveDueCards || 0,
+        consecutiveNewCards: state.consecutiveNewCards || 0
+    };
+    
+    // Snapshot supercardLastShown and current time to ensure consistent ordering
+    // This ensures the ordering matches what getNextSupercard would produce
+    const snapshotSupercardLastShown = state.supercardLastShown ? { ...state.supercardLastShown } : {};
+    const snapshotNow = new Date();
+    
+    // Generate deterministic seed from card states (ensures same states = same selection)
+    const baseSeed = generateDeterministicSeed(fsrsSubcards);
     
     // Create seeded RNG for deterministic ordering
     const seededRNG = createSeededRNG(baseSeed);
@@ -802,12 +877,10 @@ export function getAllSupercardsWithPedigree(wordlist, fsrsSubcards, lastWordId 
     const result = getOrderedSupercardCandidates(wordlist, fsrsSubcards, lastWordId, {
         randomFn: seededRNG.random.bind(seededRNG),
         applyVarietyCheck: true,
-        snapshotState: {
-            dailySupercardCount: state.dailySupercardCount,
-            consecutiveDueCards: state.consecutiveDueCards || 0,
-            consecutiveNewCards: state.consecutiveNewCards || 0
-        },
-        selectCard: false // We want the full ordered list, not just one card
+        snapshotState: snapshotState,
+        selectCard: false, // We want the full ordered list, not just one card
+        snapshotNow: snapshotNow,
+        snapshotSupercardLastShown: snapshotSupercardLastShown
     });
     
     const orderedCandidates = result.orderedCandidates || [];

@@ -2,7 +2,7 @@ import { state, bumpSession, saveState, incrementDailySupercardCount, getDailySu
 import { $, $$ } from './utils.js';
 import getCandidates from '../lib/pinyin-ime.esm.js';
 import { generateWordId } from './wordId.js';
-import { getSubcardKey, getOrCreateSubcard, getNextSupercard, recordReview, getBackModesForFront } from './fsrs.js';
+import { getSubcardKey, getOrCreateSubcard, getNextSupercard, recordReview, getBackModesForFront, commitSupercardSelection } from './fsrs.js';
 
 const FRONT_ORDER = ['hanzi', 'pronunciation', 'meaning'];
 export const FRONT_LABEL = { hanzi: 'Hanzi', pronunciation: 'Audio', pinyin: 'Pinyin', meaning: 'Meaning' };
@@ -22,6 +22,9 @@ let recordedSubcards = new Set(); // Set of subcard keys (wordId_front_backMode)
 
 // Track if we've already counted this supercard to avoid double-counting
 let currentSupercardCounted = false;
+
+// Track current card's pool name for deferred state updates
+let currentCardPoolName = null;
 
 // Track if write-cover tests have been completed correctly (first correct answer)
 let writeCoverCompleted = {
@@ -198,6 +201,9 @@ export function nextCard() {
     // Reset supercard counting flag for new card
     currentSupercardCounted = false;
     
+    // Reset pool name tracking for new card
+    currentCardPoolName = null;
+    
     // Reset performance tracking for new card
     cardPerformance = {
         gradedModalities: {},
@@ -257,7 +263,9 @@ export function nextCard() {
         state.card.tones = item.tones;
         state.card.meaning = item.meaning;
         state.card.front = front;
-        state.lastWordId = state.card.id;
+        
+        // Set fallback pool name (don't update lastWordId until completion)
+        currentCardPoolName = 'FALLBACK';
         
         console.log('Selected random card:', {
             wordId: state.card.id,
@@ -276,7 +284,9 @@ export function nextCard() {
         state.card.tones = item.tones;
         state.card.meaning = item.meaning;
         state.card.front = front;
-        state.lastWordId = state.card.id; // Track this word as the last shown
+        
+        // Store pool name for deferred commit (don't update lastWordId until completion)
+        currentCardPoolName = next.poolName;
         
         console.log('Selected FSRS card:', {
             wordId: state.card.id,
@@ -711,9 +721,12 @@ function checkAllFinished() {
     if (allFinished && visibleCount > 0) {
         btnNextBottom.style.display = 'flex';
         
-        // Increment daily supercard counter when all modalities are finished
+        // Commit supercard selection when all modalities are finished
         // Only count once per supercard (tracked by currentSupercardCounted flag)
         if (!currentSupercardCounted && state.card.word && state.card.id) {
+            // Commit the deferred state updates (counters, supercardLastShown, lastWordId)
+            commitSupercardSelection(state.card.id, state.card.front, currentCardPoolName);
+            
             incrementDailySupercardCount();
             updateDailySupercardCounter();
             currentSupercardCounted = true;
